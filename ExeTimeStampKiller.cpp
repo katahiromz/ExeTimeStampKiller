@@ -806,6 +806,8 @@ INT _tmain(INT argc, TCHAR **targv)
     if (target == NULL || bInvalidArg)
     {
         printf("Usage: ExeTimestampKiller [-v] [-s HEX] file.exe\n");
+        printf("-v       Verbose.\n");
+        printf("-s HEX   Set hexidemical timestamp value to set.\n");
         return EC_INVALIDARG;
     }
 
