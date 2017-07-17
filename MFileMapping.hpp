@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #ifndef MZC4_MFILEMAPPING_HPP_
-#define MZC4_MFILEMAPPING_HPP_      14      /* Version 14 */
+#define MZC4_MFILEMAPPING_HPP_      15      /* Version 15 */
 
 class MMapView;
     template <typename T>
