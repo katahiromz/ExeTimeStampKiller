@@ -132,10 +132,10 @@ INT DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSy
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
         return EC_SUCCESS;
 
-    DWORDLONG index = mapping.GetPos64();
+    DWORDLONG pos = mapping.GetPos64();
 
     // FIXME
-    mapping.Seek64(index, TRUE);
+    mapping.Seek64(pos, TRUE);
 
     return EC_SUCCESS;
 }
@@ -196,12 +196,10 @@ INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
 INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     mapping.Seek64(offset, TRUE);
-    const DWORD desc_size = sizeof(IMAGE_IMPORT_DESCRIPTOR);
-    const DWORD count = size / desc_size;
-    const DWORD total_size = count * desc_size;
+    const DWORD count = size / sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
     MTypedMapView<IMAGE_IMPORT_DESCRIPTOR> imp;
-    imp = mapping.GetTypedData<IMAGE_IMPORT_DESCRIPTOR>(total_size);
+    imp = mapping.GetTypedData<IMAGE_IMPORT_DESCRIPTOR>(size);
     if (!imp)
     {
         eprintf("ERROR: Unable to read\n");
@@ -368,10 +366,9 @@ INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
     mapping.Seek64(offset, TRUE);
 
     DWORD count = size / sizeof(IMAGE_DEBUG_DIRECTORY);
-    DWORD dir_size = count * count;
 
     MTypedMapView<IMAGE_DEBUG_DIRECTORY> debug;
-    debug = mapping.GetTypedData<IMAGE_DEBUG_DIRECTORY>(dir_size);
+    debug = mapping.GetTypedData<IMAGE_DEBUG_DIRECTORY>(size);
     if (!debug)
     {
         eprintf("ERROR: Unable to read\n");
@@ -393,11 +390,10 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
     MTypedMapView<IMAGE_BOUND_IMPORT_DESCRIPTOR> desc;
     MTypedMapView<IMAGE_BOUND_FORWARDER_REF> ref;
 
-    DWORDLONG index = offset;
-    DWORD ref_size;
+    DWORDLONG pos = offset;
     for (;;)
     {
-        if (index + size <= offset + sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR))
+        if (pos + size <= offset + sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR))
             break;
 
         desc = mapping.GetTypedData<IMAGE_BOUND_IMPORT_DESCRIPTOR>();
@@ -407,10 +403,10 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
             return EC_CANNOTREAD;
         }
         desc->TimeDateStamp = 0;
-        index += sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR);
+        pos += sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR);
 
         DWORD dwNumRefs = desc->NumberOfModuleForwarderRefs;
-        ref_size = dwNumRefs * sizeof(IMAGE_BOUND_FORWARDER_REF);
+        DWORD ref_size = dwNumRefs * sizeof(IMAGE_BOUND_FORWARDER_REF);
         ref = mapping.GetTypedData<IMAGE_BOUND_FORWARDER_REF>(ref_size);
         if (!ref)
         {
@@ -421,7 +417,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         {
             ref[i].TimeDateStamp = 0;
         }
-        index += ref_size;
+        pos += ref_size;
     }
 
     return EC_SUCCESS;
