@@ -791,19 +791,29 @@ INT _tmain(INT argc, TCHAR **targv)
         {
             g_bVerbose = TRUE;
         }
-        else if (lstrcmp(targv[i], TEXT("-s")) == 0 && i + 1 < argc)
+        else if (lstrcmp(targv[i], TEXT("-s")) == 0)
         {
-            TCHAR *endptr;
-            DWORD dw = _tcstoul(targv[i + 1], &endptr, 16);
-            if (*endptr == 0)
-                g_dwTimeStamp = dw;
+            if (i + 1 < argc)
+            {
+                TCHAR *endptr;
+                DWORD dw = _tcstoul(targv[i + 1], &endptr, 16);
+                if (*endptr == 0)
+                    g_dwTimeStamp = dw;
+                else
+                    bInvalidArg = TRUE;
+                ++i;
+            }
             else
+            {
                 bInvalidArg = TRUE;
-            ++i;
+            }
         }
         else
         {
-            target = targv[i];
+            if (target == NULL)
+                target = targv[i];
+            else
+                bInvalidArg = TRUE;
         }
     }
 
