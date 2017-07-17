@@ -132,7 +132,7 @@ INT DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSy
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
         return EC_SUCCESS;
 
-    DWORDLONG index = mapping.GetIndex64();
+    DWORDLONG index = mapping.GetPos64();
 
     // FIXME
     mapping.Seek64(index, TRUE);
