@@ -216,7 +216,7 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
             return EC_CANNOTREAD;
         }
 
-        eprintf("[IMAGE_IMPORT_DESCRIPTOR #%lu]", i);
+        eprintf("[IMAGE_IMPORT_DESCRIPTOR #%lu]\n", i);
         eprintf("Characteristics: 0x%08lX\n", desc->Characteristics);
         eprintf("OriginalFirstThunk: 0x%08lX\n", desc->OriginalFirstThunk);
         eprintf("TimeDateStamp: 0x%08lX\n", desc->TimeDateStamp);
