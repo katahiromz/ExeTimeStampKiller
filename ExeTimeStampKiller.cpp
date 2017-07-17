@@ -766,7 +766,11 @@ INT JustDoIt(const TCHAR *pszFileName)
 
     if (ret == 0)
     {
-        eprintf("Done.");
+#ifdef UNICODE
+        eprintf("'%S' - Done.\n", pszFileName);
+#else
+        eprintf("'%s' - Done.\n", pszFileName);
+#endif
     }
 
     return ret;
