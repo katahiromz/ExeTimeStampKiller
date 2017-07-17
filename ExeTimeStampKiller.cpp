@@ -22,14 +22,35 @@ using namespace std;
 ////////////////////////////////////////////////////////////////////////////
 
 BOOL g_bIs64Bit = FALSE;
+BOOL g_bVerbose = FALSE;
+DWORD g_dwTimeStamp = 0;
 
 void eprintf(const char *fmt, ...)
 {
+    char buf[1024];
+
     va_list va;
     va_start(va, fmt);
-    vfprintf(stderr, fmt, va);
-    fflush(stderr);
+    wvsprintfA(buf, fmt, va);
     va_end(va);
+
+    fputs(buf, stderr);
+    fflush(stderr);
+}
+
+void dprintf(const char *fmt, ...)
+{
+    if (!g_bVerbose)
+        return;
+
+    char buf[1024];
+    va_list va;
+    va_start(va, fmt);
+    wvsprintfA(buf, fmt, va);
+    va_end(va);
+
+    fputs(buf, stderr);
+    fflush(stderr);
 }
 
 enum EXITCODE
@@ -98,11 +119,11 @@ struct SECTION_INFO
 
     void Dump() const
     {
-        eprintf("#   Name      VirtSize    RVA     PhysSize  Phys off  Flags   \n");
+        dprintf("#   Name      VirtSize    RVA     PhysSize  Phys off  Flags   \n");
         for (size_t i = 0; i < m_entries.size(); ++i)
         {
             const SECTION_ENTRY *entry = &m_entries[i];
-            eprintf("%02d  %-8s  %08X  %08X  %08X  %08X  %08X\n",
+            dprintf("%02d  %-8s  %08X  %08X  %08X  %08X  %08X\n",
                 INT(i), entry->Name, entry->Size, entry->RVA,
                 entry->DataSize, entry->DataOffset, entry->Flags);
         }
@@ -142,16 +163,16 @@ INT DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSy
 
 INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
 {
-    eprintf("[IMAGE_FILE_HEADER]\n");
-    eprintf("Machine: 0x%04X\n", file.Machine);
-    eprintf("NumberOfSections: 0x%04X\n", file.NumberOfSections);
-    eprintf("TimeDateStamp: 0x%08lX\n", file.TimeDateStamp);
-    eprintf("PointerToSymbolTable: 0x%08lX\n", file.PointerToSymbolTable);
-    eprintf("NumberOfSymbols: 0x%08lX\n", file.NumberOfSymbols);
-    eprintf("SizeOfOptionalHeader: 0x%04X\n", file.SizeOfOptionalHeader);
-    eprintf("Characteristics: 0x%04X\n", file.Characteristics);
+    dprintf("[IMAGE_FILE_HEADER]\n");
+    dprintf("Machine: 0x%04X\n", file.Machine);
+    dprintf("NumberOfSections: 0x%04X\n", file.NumberOfSections);
+    dprintf("TimeDateStamp: 0x%08lX\n", file.TimeDateStamp);
+    dprintf("PointerToSymbolTable: 0x%08lX\n", file.PointerToSymbolTable);
+    dprintf("NumberOfSymbols: 0x%08lX\n", file.NumberOfSymbols);
+    dprintf("SizeOfOptionalHeader: 0x%04X\n", file.SizeOfOptionalHeader);
+    dprintf("Characteristics: 0x%04X\n", file.Characteristics);
 
-    file.TimeDateStamp = 0;
+    file.TimeDateStamp = g_dwTimeStamp;
 
     DWORD PointerToSymbolTable = file.PointerToSymbolTable;
     DWORD NumberOfSymbols = file.NumberOfSymbols;
@@ -176,20 +197,20 @@ INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
         return EC_CANNOTREAD;
     }
 
-    eprintf("[IMAGE_EXPORT_DIRECTORY]\n");
-    eprintf("Characteristics: 0x08lX\n", exp->Characteristics);
-    eprintf("TimeDateStamp: 0x08lX\n", exp->TimeDateStamp);
-    eprintf("MajorVersion: 0x04X\n", exp->MajorVersion);
-    eprintf("MinorVersion: 0x04X\n", exp->MinorVersion);
-    eprintf("Name: 0x08lX\n", exp->Name);
-    eprintf("Base: 0x08lX\n", exp->Base);
-    eprintf("NumberOfFunctions: 0x08lX\n", exp->NumberOfFunctions);
-    eprintf("NumberOfNames: 0x08lX\n", exp->NumberOfNames);
-    eprintf("AddressOfFunctions: 0x08lX\n", exp->AddressOfFunctions);
-    eprintf("AddressOfNames: 0x08lX\n", exp->AddressOfNames);
-    eprintf("AddressOfNameOrdinals: 0x08lX\n", exp->AddressOfNameOrdinals);
+    dprintf("[IMAGE_EXPORT_DIRECTORY @ 0x%08lX]\n", offset);
+    dprintf("Characteristics: 0x08lX\n", exp->Characteristics);
+    dprintf("TimeDateStamp: 0x08lX\n", exp->TimeDateStamp);
+    dprintf("MajorVersion: 0x04X\n", exp->MajorVersion);
+    dprintf("MinorVersion: 0x04X\n", exp->MinorVersion);
+    dprintf("Name: 0x08lX\n", exp->Name);
+    dprintf("Base: 0x08lX\n", exp->Base);
+    dprintf("NumberOfFunctions: 0x08lX\n", exp->NumberOfFunctions);
+    dprintf("NumberOfNames: 0x08lX\n", exp->NumberOfNames);
+    dprintf("AddressOfFunctions: 0x08lX\n", exp->AddressOfFunctions);
+    dprintf("AddressOfNames: 0x08lX\n", exp->AddressOfNames);
+    dprintf("AddressOfNameOrdinals: 0x08lX\n", exp->AddressOfNameOrdinals);
 
-    exp->TimeDateStamp = 0;
+    exp->TimeDateStamp = g_dwTimeStamp;
     return EC_SUCCESS;
 }
 
@@ -216,15 +237,15 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
             return EC_CANNOTREAD;
         }
 
-        eprintf("[IMAGE_IMPORT_DESCRIPTOR #%lu]\n", i);
-        eprintf("Characteristics: 0x%08lX\n", desc->Characteristics);
-        eprintf("OriginalFirstThunk: 0x%08lX\n", desc->OriginalFirstThunk);
-        eprintf("TimeDateStamp: 0x%08lX\n", desc->TimeDateStamp);
-        eprintf("ForwarderChain: 0x%08lX\n", desc->ForwarderChain);
-        eprintf("Name: 0x%08lX\n", desc->Name);
-        eprintf("FirstThunk: 0x%08lX\n", desc->FirstThunk);
+        dprintf("[IMAGE_IMPORT_DESCRIPTOR #%lu @ 0x%08lX]\n", i, mapping.GetPos());
+        dprintf("Characteristics: 0x%08lX\n", desc->Characteristics);
+        dprintf("OriginalFirstThunk: 0x%08lX\n", desc->OriginalFirstThunk);
+        dprintf("TimeDateStamp: 0x%08lX\n", desc->TimeDateStamp);
+        dprintf("ForwarderChain: 0x%08lX\n", desc->ForwarderChain);
+        dprintf("Name: 0x%08lX\n", desc->Name);
+        dprintf("FirstThunk: 0x%08lX\n", desc->FirstThunk);
 
-        desc->TimeDateStamp = 0;
+        desc->TimeDateStamp = g_dwTimeStamp;
         if (desc->Characteristics == 0)
             break;
 
@@ -235,14 +256,31 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
 }
 
 INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
-             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir);
+             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos);
 
 INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
-             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY_ENTRY& ent)
+             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY_ENTRY& ent,
+             DWORD pos)
 {
+    dprintf("[IMAGE_RESOURCE_DIRECTORY_ENTRY @ 0x%08lX]\n", pos);
+    if (ent.NameIsString)
+    {
+        dprintf("name is string\n");
+        dprintf("NameOffset: 0x%08lX\n", ent.NameOffset);
+    }
+    else
+    {
+        dprintf("name is not string\n");
+        dprintf("Id: 0x%04X\n", ent.Id);
+    }
+
     if (ent.DataIsDirectory)
     {
-        mapping.Seek64(res_offset + ent.OffsetToDirectory, TRUE);
+        dprintf("data is directory\n");
+        dprintf("OffsetToDirectory: 0x%08lX\n", ent.OffsetToDirectory);
+
+        DWORD pos = res_offset + ent.OffsetToDirectory;
+        mapping.Seek64(pos, TRUE);
 
         MTypedMapView<IMAGE_RESOURCE_DIRECTORY> dir;
         dir = mapping.GetTypedData<IMAGE_RESOURCE_DIRECTORY>();
@@ -252,10 +290,13 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
             return EC_CANNOTREAD;
         }
 
-        return DoResDir(mapping, sec_info, res_offset, *dir);
+        return DoResDir(mapping, sec_info, res_offset, *dir, pos);
     }
     else
     {
+        dprintf("data is not directory\n");
+        dprintf("OffsetToData: 0x%08lX\n", ent.OffsetToData);
+
         mapping.Seek64(res_offset + ent.OffsetToData, TRUE);
 
         MTypedMapView<IMAGE_RESOURCE_DATA_ENTRY> data;
@@ -273,9 +314,17 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
 }
 
 INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
-             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir)
+             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos)
 {
-    dir.TimeDateStamp = 0;
+    dprintf("[IMAGE_RESOURCE_DIRECTORY @ 0x%08lX]: \n", pos);
+    dprintf("Characteristics: 0x%08lX\n", dir.Characteristics);
+    dprintf("TimeDateStamp: 0x%08lX\n", dir.TimeDateStamp);
+    dprintf("MajorVersion: 0x%04X\n", dir.MajorVersion);
+    dprintf("MinorVersion: 0x%04X\n", dir.MinorVersion);
+    dprintf("NumberOfNamedEntries: 0x%04X\n", dir.NumberOfNamedEntries);
+    dprintf("NumberOfIdEntries: 0x%04X\n", dir.NumberOfIdEntries);
+
+    dir.TimeDateStamp = g_dwTimeStamp;
     mapping.Seek64(sizeof(IMAGE_RESOURCE_DIRECTORY));
 
     DWORD num_entries = dir.NumberOfNamedEntries + dir.NumberOfIdEntries;
@@ -294,7 +343,8 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
     for (DWORD i = 0; i < num_entries; ++i)
     {
         IMAGE_RESOURCE_DIRECTORY_ENTRY& ent = entries[i];
-        INT ret = DoResEnt(mapping, sec_info, res_offset, ent);
+        DWORD pos = mapping.GetPos() + i * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY);
+        INT ret = DoResEnt(mapping, sec_info, res_offset, ent, pos);
         if (ret)
             return ret;
     }
@@ -314,7 +364,7 @@ INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD siz
         return EC_CANNOTREAD;
     }
 
-    return DoResDir(mapping, sec_info, offset, *dir);
+    return DoResDir(mapping, sec_info, offset, *dir, offset);
 }
 
 INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -329,7 +379,7 @@ INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
         return EC_CANNOTREAD;
     }
 
-    config->TimeDateStamp = 0;
+    config->TimeDateStamp = g_dwTimeStamp;
     return EC_SUCCESS;
 }
 
@@ -345,7 +395,7 @@ INT DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
         return EC_CANNOTREAD;
     }
 
-    config->TimeDateStamp = 0;
+    config->TimeDateStamp = g_dwTimeStamp;
     return EC_SUCCESS;
 }
 
@@ -377,7 +427,16 @@ INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
 
     for (DWORD i = 0; i < count; ++i)
     {
-        debug[i].TimeDateStamp = 0;
+        dprintf("[IMAGE_DEBUG_DIRECTORY #%lu]\n", i);
+        dprintf("Characteristics: 0x%08lX\n", debug[i].Characteristics);
+        dprintf("TimeDateStamp: 0x%08lX\n", debug[i].TimeDateStamp);
+        dprintf("MajorVersion: 0x%04X\n", debug[i].MajorVersion);
+        dprintf("MinorVersion: 0x%04X\n", debug[i].MinorVersion);
+        dprintf("Type: 0x%08lX\n", debug[i].Type);
+        dprintf("SizeOfData: 0x%08lX\n", debug[i].SizeOfData);
+        dprintf("AddressOfRawData: 0x%08lX\n", debug[i].AddressOfRawData);
+        dprintf("PointerToRawData: 0x%08lX\n", debug[i].PointerToRawData);
+        debug[i].TimeDateStamp = g_dwTimeStamp;
     }
 
     return EC_SUCCESS;
@@ -385,39 +444,53 @@ INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
 
 INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
-
     MTypedMapView<IMAGE_BOUND_IMPORT_DESCRIPTOR> desc;
     MTypedMapView<IMAGE_BOUND_FORWARDER_REF> ref;
 
     DWORDLONG pos = offset;
     for (;;)
     {
-        if (pos + size <= offset + sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR))
+        if (offset + size < pos + sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR))
             break;
 
+        mapping.Seek64(pos, TRUE);
         desc = mapping.GetTypedData<IMAGE_BOUND_IMPORT_DESCRIPTOR>();
         if (!desc)
         {
             eprintf("ERROR: Unable to read\n");
             return EC_CANNOTREAD;
         }
-        desc->TimeDateStamp = 0;
+
+        dprintf("[IMAGE_BOUND_IMPORT_DESCRIPTOR @ 0x%08lX]\n", pos);
+        dprintf("TimeDateStamp: 0x%08lX\n", desc->TimeDateStamp);
+        dprintf("OffsetModuleName: 0x%04X\n", desc->OffsetModuleName);
+        dprintf("NumberOfModuleForwarderRefs: 0x%04X\n", desc->NumberOfModuleForwarderRefs);
+
+        desc->TimeDateStamp = g_dwTimeStamp;
         pos += sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR);
 
-        DWORD dwNumRefs = desc->NumberOfModuleForwarderRefs;
-        DWORD ref_size = dwNumRefs * sizeof(IMAGE_BOUND_FORWARDER_REF);
+        DWORD count = desc->NumberOfModuleForwarderRefs;
+        DWORD ref_size = count * sizeof(IMAGE_BOUND_FORWARDER_REF);
+        if (offset + size < pos + ref_size)
+            break;
+
+        mapping.Seek64(pos, TRUE);
         ref = mapping.GetTypedData<IMAGE_BOUND_FORWARDER_REF>(ref_size);
         if (!ref)
         {
             eprintf("ERROR: Unable to read\n");
             return EC_CANNOTREAD;
         }
-        for (DWORD i = 0; i < dwNumRefs; ++i)
+        for (DWORD i = 0; i < count; ++i)
         {
-            ref[i].TimeDateStamp = 0;
+            dprintf("[IMAGE_BOUND_FORWARDER_REF #%lu @ 0x%08lX]\n", i, pos);
+            dprintf("TimeDateStamp: 0x%08lX\n", ref[i].TimeDateStamp);
+            dprintf("OffsetModuleName: 0x%04X\n", ref[i].OffsetModuleName);
+            dprintf("Reserved: 0x%04X\n", ref[i].Reserved);
+
+            ref[i].TimeDateStamp = g_dwTimeStamp;
+            pos += sizeof(IMAGE_BOUND_FORWARDER_REF);
         }
-        pos += ref_size;
     }
 
     return EC_SUCCESS;
@@ -457,7 +530,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoExp(mapping, offset, size);
         if (ret)
             return ret;
-        eprintf("DoExp.\n");
+        dprintf("DoExp done.\n");
     }
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_IMPORT];
@@ -468,7 +541,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoImp(mapping, offset, size);
         if (ret)
             return ret;
-        eprintf("DoImp.\n");
+        dprintf("DoImp done.\n");
     }
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_RESOURCE];
@@ -479,7 +552,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoRes(mapping, sec_info, offset, size);
         if (ret)
             return ret;
-        eprintf("DoRes.\n");
+        dprintf("DoRes done.\n");
     }
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG];
@@ -490,7 +563,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoLoadConfig(mapping, offset, size);
         if (ret)
             return ret;
-        eprintf("DoLoadConfig.\n");
+        dprintf("DoLoadConfig done.\n");
     }
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_DEBUG];
@@ -501,7 +574,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoDebug(mapping, offset, size);
         if (ret)
             return ret;
-        eprintf("DoDebug.\n");
+        dprintf("DoDebug done.\n");
     }
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
@@ -512,7 +585,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoBoundImp(mapping, offset, size);
         if (ret)
             return ret;
-        eprintf("DoBoundImp.\n");
+        dprintf("DoBoundImp done.\n");
     }
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT];
@@ -523,7 +596,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         ret = DoDelayImp(mapping, offset, size);
         if (ret)
             return ret;
-        eprintf("DoDelayImp.\n");
+        dprintf("DoDelayImp done.\n");
     }
 
     return EC_SUCCESS;
@@ -596,7 +669,7 @@ INT DoMap(HANDLE hFile)
         eprintf("ERROR: Unable to open file\n");
         return EC_CANNOTOPEN;
     }
-    eprintf("Mapped.\n");
+    dprintf("Mapped.\n");
 
     {
         MTypedMapView<IMAGE_DOS_HEADER> dos;
@@ -610,7 +683,7 @@ INT DoMap(HANDLE hFile)
         if (dos->e_magic == IMAGE_DOS_SIGNATURE)
         {
             mapping.Seek64(dos->e_lfanew);
-            eprintf("DOS Header.\n");
+            dprintf("DOS Header done.\n");
         }
     }
 
@@ -623,14 +696,14 @@ INT DoMap(HANDLE hFile)
             eprintf("ERROR: Unable to read\n");
             return EC_CANNOTREAD;
         }
-        eprintf("NT Header.\n");
+        dprintf("NT Header done.\n");
         if (nt32->Signature != IMAGE_NT_SIGNATURE)
         {
             eprintf("ERROR: Invalid executable file\n");
             return EC_INVALIDFORMAT;
         }
         SizeOfOptionalHeader = nt32->FileHeader.SizeOfOptionalHeader;
-        eprintf("SizeOfOptionalHeader: %d.\n", SizeOfOptionalHeader);
+        dprintf("SizeOfOptionalHeader: %d.\n", SizeOfOptionalHeader);
     }
 
     if (SizeOfOptionalHeader == sizeof(IMAGE_OPTIONAL_HEADER32))
@@ -643,7 +716,7 @@ INT DoMap(HANDLE hFile)
             eprintf("ERROR: Unable to read\n");
             return EC_CANNOTREAD;
         }
-        eprintf("NT32.\n");
+        dprintf("NT32 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS32));
         return DoNT32(mapping, *nt32);
     }
@@ -657,7 +730,7 @@ INT DoMap(HANDLE hFile)
             eprintf("ERROR: Unable to read\n");
             return EC_CANNOTREAD;
         }
-        eprintf("NT64.\n");
+        dprintf("NT64 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS64));
         return DoNT64(mapping, *nt64);
     }
@@ -672,6 +745,12 @@ INT JustDoIt(const TCHAR *pszFileName)
 {
     HANDLE hFile;
 
+#ifdef UNICODE
+    dprintf("Opening file '%S'...\n", pszFileName);
+#else
+    dprintf("Opening file '%s'...\n", pszFileName);
+#endif
+
     hFile = CreateFile(pszFileName, GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
@@ -679,11 +758,11 @@ INT JustDoIt(const TCHAR *pszFileName)
         eprintf("ERROR: Unable to open file\n");
         return EC_CANNOTOPEN;
     }
-    eprintf("Opened.\n");
+    dprintf("Opened.\n");
 
     INT ret = DoMap(hFile);
     CloseHandle(hFile);
-    eprintf("Closed.\n");
+    dprintf("Closed.\n");
 
     return ret;
 }
@@ -691,13 +770,41 @@ INT JustDoIt(const TCHAR *pszFileName)
 extern "C"
 INT _tmain(INT argc, TCHAR **targv)
 {
-    if (argc != 2)
+    TCHAR *target = NULL;
+
+    g_bVerbose = FALSE;
+    g_dwTimeStamp = 0;
+    BOOL bInvalidArg = FALSE;
+
+    for (int i = 1; i < argc; ++i)
     {
-        printf("Usage: ExeTimestampKiller file.exe\n");
+        if (lstrcmp(targv[i], TEXT("-v")) == 0)
+        {
+            g_bVerbose = TRUE;
+        }
+        else if (lstrcmp(targv[i], TEXT("-s")) == 0 && i + 1 < argc)
+        {
+            TCHAR *endptr;
+            DWORD dw = _tcstoul(targv[i + 1], &endptr, 16);
+            if (*endptr == 0)
+                g_dwTimeStamp = dw;
+            else
+                bInvalidArg = TRUE;
+            ++i;
+        }
+        else
+        {
+            target = targv[i];
+        }
+    }
+
+    if (target == NULL || bInvalidArg)
+    {
+        printf("Usage: ExeTimestampKiller [-v] file.exe\n");
         return EC_INVALIDARG;
     }
 
-    return JustDoIt(targv[1]);
+    return JustDoIt(target);
 }
 
 ////////////////////////////////////////////////////////////////////////////
