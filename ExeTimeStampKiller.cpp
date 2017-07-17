@@ -1,4 +1,4 @@
-// ExeTimeStampKiller.cpp --- Deletes EXE timestamps
+// ExeTimeStampKiller.cpp --- Resets the timestamps in an EXE or DLL file
 // Copyright (C) 2017 Katayama Hirofumi MZ.
 // This software is public domain software (PDS).
 ////////////////////////////////////////////////////////////////////////////
