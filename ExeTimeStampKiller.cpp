@@ -180,7 +180,7 @@ INT DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSy
     DWORDLONG pos = mapping.GetPos64();
 
     // FIXME
-    mapping.Seek64(pos, TRUE);
+    mapping.SetPos64(pos);
 
     return RET_SUCCESS;
 }
@@ -213,7 +213,7 @@ INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
 INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     MTypedMapView<IMAGE_EXPORT_DIRECTORY> exp;
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
     exp = mapping.GetTypedData<IMAGE_EXPORT_DIRECTORY>();
     if (!exp)
     {
@@ -240,7 +240,7 @@ INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
 
 INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
     const DWORD count = size / sizeof(IMAGE_IMPORT_DESCRIPTOR);
 
     MTypedMapView<IMAGE_IMPORT_DESCRIPTOR> imp;
@@ -304,7 +304,7 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
         dprintf("OffsetToDirectory: 0x%08lX\n", ent.OffsetToDirectory);
 
         DWORD pos = res_offset + ent.OffsetToDirectory;
-        mapping.Seek64(pos, TRUE);
+        mapping.SetPos64(pos);
 
         MTypedMapView<IMAGE_RESOURCE_DIRECTORY> dir;
         dir = mapping.GetTypedData<IMAGE_RESOURCE_DIRECTORY>();
@@ -321,7 +321,7 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
         dprintf("data is not directory\n");
         dprintf("OffsetToData: 0x%08lX\n", ent.OffsetToData);
 
-        mapping.Seek64(res_offset + ent.OffsetToData, TRUE);
+        mapping.SetPos64(res_offset + ent.OffsetToData);
 
         MTypedMapView<IMAGE_RESOURCE_DATA_ENTRY> data;
         data = mapping.GetTypedData<IMAGE_RESOURCE_DATA_ENTRY>();
@@ -378,7 +378,7 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
 
 INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
 
     MTypedMapView<IMAGE_RESOURCE_DIRECTORY> dir;
     dir = mapping.GetTypedData<IMAGE_RESOURCE_DIRECTORY>();
@@ -393,7 +393,7 @@ INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD siz
 
 INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
 
     MTypedMapView<IMAGE_LOAD_CONFIG_DIRECTORY32> config;
     config = mapping.GetTypedData<IMAGE_LOAD_CONFIG_DIRECTORY32>();
@@ -409,7 +409,7 @@ INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
 
 INT DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
 
     MTypedMapView<IMAGE_LOAD_CONFIG_DIRECTORY64> config;
     config = mapping.GetTypedData<IMAGE_LOAD_CONFIG_DIRECTORY64>();
@@ -437,7 +437,7 @@ INT DoLoadConfig(MFileMapping& mapping, DWORD offset, DWORD size)
 
 INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
 
     DWORD count = size / sizeof(IMAGE_DEBUG_DIRECTORY);
 
@@ -477,7 +477,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         if (offset + size < pos + sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR))
             break;
 
-        mapping.Seek64(pos, TRUE);
+        mapping.SetPos64(pos);
         desc = mapping.GetTypedData<IMAGE_BOUND_IMPORT_DESCRIPTOR>();
         if (!desc)
         {
@@ -498,7 +498,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         if (offset + size < pos + ref_size)
             break;
 
-        mapping.Seek64(pos, TRUE);
+        mapping.SetPos64(pos);
         ref = mapping.GetTypedData<IMAGE_BOUND_FORWARDER_REF>(ref_size);
         if (!ref)
         {
@@ -522,7 +522,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
 
 INT DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
-    mapping.Seek64(offset, TRUE);
+    mapping.SetPos64(offset);
 
     MTypedMapView<ImgDelayDescr> descr;
     descr = mapping.GetTypedData<ImgDelayDescr>();
