@@ -26,7 +26,7 @@ TCHAR *g_target;
 
 void ShowVersion(void)
 {
-    printf("ExeTimeStampKiller Version 0.3 / 2017.07.18\n");
+    printf("ExeTimeStampKiller Version 0.4 / 2017.07.18\n");
     printf("Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n");
     printf("This software is public domain software (PDS).\n");
 }
@@ -778,7 +778,11 @@ INT JustDoIt(const TCHAR *pszFileName)
         FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        eprintf("ERROR: Unable to open file\n");
+#ifdef UNICODE
+        eprintf("ERROR: Unable to open file - '%S'\n", pszFileName);
+#else
+        eprintf("ERROR: Unable to open file - '%s'\n", pszFileName);
+#endif
         return RET_CANNOTOPEN;
     }
     dprintf("Opened.\n");
@@ -968,9 +972,13 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
             // --version
             return RET_SHOWVERSION;
         }
-        else if (arg[0] == TEXT('-'))
+        else if (arg[0] == TEXT('-') || arg[0] == TEXT('/'))
         {
-            eprintf("ERROR: Invalid argument.\n");
+#ifdef UNICODE
+            eprintf("ERROR: Invalid argument - '%S'.\n", arg);
+#else
+            eprintf("ERROR: Invalid argument - '%s'.\n", arg);
+#endif
             return RET_INVALIDARG;
         }
         else
