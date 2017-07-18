@@ -287,7 +287,7 @@ DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
         dprintf("FirstThunk: 0x%08lX\n", desc->FirstThunk);
 
         // FUCK
-        // NOTE: We should not change import section
+        // NOTE: We should not change import section.
         //desc->TimeDateStamp = g_dwTimeStamp;
 
         if (desc->Characteristics == 0)
