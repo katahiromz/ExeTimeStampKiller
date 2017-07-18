@@ -24,6 +24,26 @@ BOOL g_bVerbose;
 DWORD g_dwTimeStamp;
 TCHAR *g_target;
 
+VOID ShowVersion(VOID)
+{
+    printf("ExeTimeStampKiller Version 0.3 / 2017.07.18\n");
+    printf("Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n");
+    printf("This software is public domain software (PDS).\n");
+}
+
+void ShowHelp(void)
+{
+    printf("Usage: ExeTimestampKiller [options] file.exe\n");
+    printf("Options:\n");
+    printf("-n              Set now.\n");
+    printf("-d YYYYMMDD     Set date.\n");
+    printf("-t HHmmss       Set time.\n");
+    printf("-v              Verbose output.\n");
+    printf("-x XXXXXXXX     Set hexidemical timestamp value to set.\n");
+    printf("--help          Show this help.\n");
+    printf("--version       Show version.\n");
+}
+
 ////////////////////////////////////////////////////////////////////////////
 
 void eprintf(const char *fmt, ...)
@@ -61,7 +81,8 @@ enum RETURNCODE
     RET_CANNOTREAD,
     RET_INVALIDFORMAT,
     RET_INVALIDARG,
-    RET_SHOWHELP
+    RET_SHOWHELP,
+    RET_SHOWVERSION
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -819,18 +840,6 @@ DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst)
     return QuadToTimeStamp(quad);
 }
 
-void ShowHelp(void)
-{
-    printf("Usage: ExeTimestampKiller [options] file.exe\n");
-    printf("Options:");
-    printf("-v              Verbose.\n");
-    printf("-x XXXXXXXX     Set hexidemical timestamp value to set.\n");
-    printf("-n              Set now.\n");
-    printf("-d YYYYMMDD     Set date.\n");
-    printf("-t HHmmss       Set time.\n");
-    printf("--help          Show this help.\n");
-}
-
 VOID Init(VOID)
 {
     g_bIs64Bit = FALSE;
@@ -952,6 +961,10 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         {
             return RET_SHOWHELP;
         }
+        else if (lstrcmp(arg, TEXT("--version")) == 0)
+        {
+            return RET_SHOWVERSION;
+        }
         else if (arg[0] == TEXT('-'))
         {
             eprintf("ERROR: Invalid argument.\n");
@@ -1009,6 +1022,11 @@ INT _tmain(INT argc, TCHAR **targv)
     if (ret == RET_SHOWHELP)
     {
         ShowHelp();
+        return RET_SUCCESS;
+    }
+    if (ret == RET_SHOWVERSION)
+    {
+        ShowVersion();
         return RET_SUCCESS;
     }
 
