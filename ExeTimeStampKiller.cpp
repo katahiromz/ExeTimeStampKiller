@@ -19,35 +19,47 @@
 
 using namespace std;
 
-BOOL g_bIs64Bit;
-BOOL g_bVerbose;
-DWORD g_dwTimeStamp;
-TCHAR *g_target;
+////////////////////////////////////////////////////////////////////////////
 
-void ShowVersion(void)
+static BOOL   g_bIs64Bit            = FALSE;
+static BOOL   g_bVerbose            = FALSE;
+static DWORD  g_dwTimeStamp         = 0;
+static DWORD  g_dwFileHeaderFlags   = 0;
+static TCHAR *g_pszTargetFile       = NULL;
+
+static void InitApp(void)
 {
-    printf("ExeTimeStampKiller Version 0.6 / 2017.07.18\n");
-    printf("Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n");
-    printf("This software is public domain software (PDS).\n");
+    g_bIs64Bit = FALSE;
+    g_bVerbose = FALSE;
+    g_dwTimeStamp = 0;
+    g_dwFileHeaderFlags = 0;
+    g_pszTargetFile = NULL;
 }
 
-void ShowHelp(void)
+static void ShowVersion(void)
 {
-    printf("Usage: ExeTimestampKiller [options] file.exe\n");
-    printf("\nOptions:\n");
-    printf("-n              Set now.\n");
-    printf("-d YYYYMMDD     Set date.\n");
-    printf("-t HHmmss       Set time.\n");
-    printf("-v              Verbose output.\n");
-    printf("-g              Parse as global time.\n");
-    printf("-x XXXXXXXX     Set hexidemical timestamp value to set.\n");
-    printf("--help          Show this help.\n");
-    printf("--version       Show version.\n");
+    puts("ExeTimeStampKiller Version 0.9 / 2017.07.18\n"
+         "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
+         "This software is public domain software (PDS).\n");
+}
+
+static void ShowHelp(void)
+{
+    puts("Usage: ExeTimestampKiller [options] file.exe\n"
+         "\nOptions:\n"
+         "-n              Set now.\n"
+         "-d YYYYMMDD     Set date.\n"
+         "-t HHmmss       Set time.\n"
+         "-v              Verbose output.\n"
+         "-g              Parse as global time.\n"
+         "-x XXXXXXXX     Set hexidemical timestamp value to set.\n"
+         "--help          Show this help.\n"
+         "--version       Show version.\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////
 
-void eprintf(const char *fmt, ...)
+static inline void eprintf(const char *fmt, ...)
 {
     char buf[1024];
 
@@ -60,7 +72,7 @@ void eprintf(const char *fmt, ...)
     fflush(stderr);
 }
 
-void dprintf(const char *fmt, ...)
+static inline void dprintf(const char *fmt, ...)
 {
     if (!g_bVerbose)
         return;
@@ -75,7 +87,7 @@ void dprintf(const char *fmt, ...)
     fflush(stderr);
 }
 
-enum RETURNCODE
+enum RETURN_CODE
 {
     RET_SUCCESS = 0,
     RET_CANNOTOPEN,
@@ -172,20 +184,20 @@ struct SECTION_INFO
 
 ////////////////////////////////////////////////////////////////////////////
 
-INT DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
+static INT
+DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 {
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
         return RET_SUCCESS;
 
-    DWORDLONG pos = mapping.GetPos64();
-
-    // FIXME
-    mapping.SetPos64(pos);
+    // FUCK
+    eprintf("FIXME: IMAGE_AUX_SYMBOL.CheckSum\n");
 
     return RET_SUCCESS;
 }
 
-INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
+static INT
+DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
 {
     dprintf("[IMAGE_FILE_HEADER]\n");
     dprintf("Machine: 0x%04X\n", file.Machine);
@@ -195,7 +207,9 @@ INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
     dprintf("NumberOfSymbols: 0x%08lX\n", file.NumberOfSymbols);
     dprintf("SizeOfOptionalHeader: 0x%04X\n", file.SizeOfOptionalHeader);
     dprintf("Characteristics: 0x%04X\n", file.Characteristics);
+    g_dwFileHeaderFlags = file.Characteristics;
 
+    // FUCK
     file.TimeDateStamp = g_dwTimeStamp;
 
     DWORD PointerToSymbolTable = file.PointerToSymbolTable;
@@ -210,7 +224,8 @@ INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
     return RET_SUCCESS;
 }
 
-INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     MTypedMapView<IMAGE_EXPORT_DIRECTORY> exp;
     mapping.SetPos64(offset);
@@ -234,11 +249,13 @@ INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
     dprintf("AddressOfNames: 0x08lX\n", exp->AddressOfNames);
     dprintf("AddressOfNameOrdinals: 0x08lX\n", exp->AddressOfNameOrdinals);
 
+    // FUCK
     exp->TimeDateStamp = g_dwTimeStamp;
     return RET_SUCCESS;
 }
 
-INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     mapping.SetPos64(offset);
     const DWORD count = size / sizeof(IMAGE_IMPORT_DESCRIPTOR);
@@ -269,7 +286,10 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
         dprintf("Name: 0x%08lX\n", desc->Name);
         dprintf("FirstThunk: 0x%08lX\n", desc->FirstThunk);
 
-        desc->TimeDateStamp = g_dwTimeStamp;
+        // FUCK
+        // NOTE: We should not change import section
+        //desc->TimeDateStamp = g_dwTimeStamp;
+
         if (desc->Characteristics == 0)
             break;
 
@@ -279,12 +299,14 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
     return RET_SUCCESS;
 }
 
-INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
-             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos);
+static INT
+DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
+         DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos);
 
-INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
-             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY_ENTRY& ent,
-             DWORD pos)
+static INT
+DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
+         DWORD res_offset, IMAGE_RESOURCE_DIRECTORY_ENTRY& ent,
+         DWORD pos)
 {
     dprintf("[IMAGE_RESOURCE_DIRECTORY_ENTRY @ 0x%08lX]\n", pos);
     if (ent.NameIsString)
@@ -331,14 +353,13 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
             return RET_CANNOTREAD;
         }
 
-        // FIXME
-
         return RET_SUCCESS;
     }
 }
 
-INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
-             DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos)
+static INT
+DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
+         DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos)
 {
     dprintf("[IMAGE_RESOURCE_DIRECTORY @ 0x%08lX]: \n", pos);
     dprintf("Characteristics: 0x%08lX\n", dir.Characteristics);
@@ -348,7 +369,9 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
     dprintf("NumberOfNamedEntries: 0x%04X\n", dir.NumberOfNamedEntries);
     dprintf("NumberOfIdEntries: 0x%04X\n", dir.NumberOfIdEntries);
 
+    // FUCK
     dir.TimeDateStamp = g_dwTimeStamp;
+
     mapping.Seek64(sizeof(IMAGE_RESOURCE_DIRECTORY));
 
     DWORD num_entries = dir.NumberOfNamedEntries + dir.NumberOfIdEntries;
@@ -376,7 +399,8 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
     return RET_SUCCESS;
 }
 
-INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD size)
+static INT
+DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD size)
 {
     mapping.SetPos64(offset);
 
@@ -391,7 +415,8 @@ INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD siz
     return DoResDir(mapping, sec_info, offset, *dir, offset);
 }
 
-INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     mapping.SetPos64(offset);
 
@@ -403,11 +428,13 @@ INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
         return RET_CANNOTREAD;
     }
 
+    // FUCK
     config->TimeDateStamp = g_dwTimeStamp;
     return RET_SUCCESS;
 }
 
-INT DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     mapping.SetPos64(offset);
 
@@ -419,11 +446,13 @@ INT DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
         return RET_CANNOTREAD;
     }
 
+    // FUCK
     config->TimeDateStamp = g_dwTimeStamp;
     return RET_SUCCESS;
 }
 
-INT DoLoadConfig(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoLoadConfig(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     if (g_bIs64Bit)
     {
@@ -435,11 +464,18 @@ INT DoLoadConfig(MFileMapping& mapping, DWORD offset, DWORD size)
     }
 }
 
-INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     mapping.SetPos64(offset);
 
     DWORD count = size / sizeof(IMAGE_DEBUG_DIRECTORY);
+
+    if (g_dwFileHeaderFlags & IMAGE_FILE_DEBUG_STRIPPED)
+    {
+        eprintf("FIXME: IMAGE_SEPARATE_DEBUG_HEADER\n");
+        return RET_SUCCESS;
+    }
 
     MTypedMapView<IMAGE_DEBUG_DIRECTORY> debug;
     debug = mapping.GetTypedData<IMAGE_DEBUG_DIRECTORY>(size);
@@ -460,13 +496,16 @@ INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
         dprintf("SizeOfData: 0x%08lX\n", debug[i].SizeOfData);
         dprintf("AddressOfRawData: 0x%08lX\n", debug[i].AddressOfRawData);
         dprintf("PointerToRawData: 0x%08lX\n", debug[i].PointerToRawData);
+
+        // FUCK
         debug[i].TimeDateStamp = g_dwTimeStamp;
     }
 
     return RET_SUCCESS;
 }
 
-INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     MTypedMapView<IMAGE_BOUND_IMPORT_DESCRIPTOR> desc;
     MTypedMapView<IMAGE_BOUND_FORWARDER_REF> ref;
@@ -490,6 +529,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         dprintf("OffsetModuleName: 0x%04X\n", desc->OffsetModuleName);
         dprintf("NumberOfModuleForwarderRefs: 0x%04X\n", desc->NumberOfModuleForwarderRefs);
 
+        // FUCK
         desc->TimeDateStamp = g_dwTimeStamp;
         pos += sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR);
 
@@ -512,6 +552,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
             dprintf("OffsetModuleName: 0x%04X\n", ref[i].OffsetModuleName);
             dprintf("Reserved: 0x%04X\n", ref[i].Reserved);
 
+            // FUCK
             ref[i].TimeDateStamp = g_dwTimeStamp;
             pos += sizeof(IMAGE_BOUND_FORWARDER_REF);
         }
@@ -520,7 +561,8 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
     return RET_SUCCESS;
 }
 
-INT DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
+static INT
+DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
     mapping.SetPos64(offset);
 
@@ -537,8 +579,9 @@ INT DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
     return RET_SUCCESS;
 }
 
-INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
-           IMAGE_DATA_DIRECTORY *pDir)
+static INT
+DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
+       IMAGE_DATA_DIRECTORY *pDir)
 {
     sec_info.Dump();
 
@@ -626,7 +669,8 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
     return RET_SUCCESS;
 }
 
-INT DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32)
+static INT
+DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32, DWORD offset)
 {
     IMAGE_OPTIONAL_HEADER32& opt32 = nt32.OptionalHeader;
     if (opt32.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC)
@@ -634,15 +678,26 @@ INT DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32)
         eprintf("ERROR: Invalid executable file\n");
         return RET_INVALIDFORMAT;
     }
+
+    dprintf("[IMAGE_OPTIONAL_HEADER32 @ 0x%08lX]\n", offset);
+    dprintf("ImageBase: 0x%08lX\n", opt32.ImageBase);
+    dprintf("SizeOfHeaders: 0x%08lX\n", opt32.SizeOfHeaders);
+    dprintf("CheckSum: 0x%08lX\n", opt32.CheckSum);
+    dprintf("Subsystem: 0x%04X\n", opt32.Subsystem);
+    dprintf("DllCharacteristics: 0x%04X\n", opt32.DllCharacteristics);
+
+    // FUCK
     opt32.CheckSum = 0;
 
     IMAGE_FILE_HEADER& file = nt32.FileHeader;
     WORD NumberOfSections = file.NumberOfSections;
+    dprintf("NumberOfSections: 0x%04X\n", NumberOfSections);
     INT ret = DoFileHeader(mapping, file);
     if (ret)
         return ret;
 
     MTypedMapView<IMAGE_SECTION_HEADER> sections;
+    dprintf("[IMAGE_SECTION_HEADER @ 0x%08lX]\n", mapping.GetPos());
     DWORD sect_total = NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
     sections = mapping.GetTypedData<IMAGE_SECTION_HEADER>(sect_total);
     if (!sections)
@@ -655,7 +710,8 @@ INT DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32)
     return DoSect(mapping, sec_info, opt32.DataDirectory);
 }
 
-INT DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64)
+static INT
+DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64, DWORD offset)
 {
     IMAGE_OPTIONAL_HEADER64& opt64 = nt64.OptionalHeader;
     if (opt64.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
@@ -663,15 +719,27 @@ INT DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64)
         eprintf("ERROR: Invalid executable file\n");
         return RET_INVALIDFORMAT;
     }
+
+    dprintf("[IMAGE_OPTIONAL_HEADER64 @ 0x%08lX]\n", offset);
+    dprintf("ImageBase: 0x%08lX%08lX\n", HILONG(opt64.ImageBase),
+                                         LOLONG(opt64.ImageBase));
+    dprintf("SizeOfHeaders: 0x%08lX\n", opt64.SizeOfHeaders);
+    dprintf("CheckSum: 0x%08lX\n", opt64.CheckSum);
+    dprintf("Subsystem: 0x%04X\n", opt64.Subsystem);
+    dprintf("DllCharacteristics: 0x%04X\n", opt64.DllCharacteristics);
+
+    // FUCK
     opt64.CheckSum = 0;
 
     IMAGE_FILE_HEADER& file = nt64.FileHeader;
     WORD NumberOfSections = file.NumberOfSections;
+    dprintf("NumberOfSections: 0x%04X\n", NumberOfSections);
     INT ret = DoFileHeader(mapping, file);
     if (ret)
         return ret;
 
     MTypedMapView<IMAGE_SECTION_HEADER> sections;
+    dprintf("[IMAGE_SECTION_HEADER @ 0x%08lX]\n", mapping.GetPos());
     DWORD sect_total = NumberOfSections * sizeof(IMAGE_SECTION_HEADER);
     sections = mapping.GetTypedData<IMAGE_SECTION_HEADER>(sect_total);
     if (!sections)
@@ -684,7 +752,7 @@ INT DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64)
     return DoSect(mapping, sec_info, opt64.DataDirectory);
 }
 
-INT DoMap(HANDLE hFile)
+static INT DoMap(HANDLE hFile)
 {
     MFileMapping mapping;
 
@@ -706,6 +774,9 @@ INT DoMap(HANDLE hFile)
 
         if (dos->e_magic == IMAGE_DOS_SIGNATURE)
         {
+            // FUCK
+            dos->e_csum = 0;
+
             mapping.Seek64(dos->e_lfanew);
             dprintf("DOS Header done.\n");
         }
@@ -730,9 +801,12 @@ INT DoMap(HANDLE hFile)
         dprintf("SizeOfOptionalHeader: %d.\n", SizeOfOptionalHeader);
     }
 
+    DWORD offset = mapping.GetPos();
     if (SizeOfOptionalHeader == sizeof(IMAGE_OPTIONAL_HEADER32))
     {
         g_bIs64Bit = FALSE;
+        dprintf("[IMAGE_NT_HEADERS32 @ 0x%08lX]\n", offset);
+
         MTypedMapView<IMAGE_NT_HEADERS32> nt32;
         nt32 = mapping.GetTypedData<IMAGE_NT_HEADERS32>();
         if (!nt32)
@@ -740,13 +814,18 @@ INT DoMap(HANDLE hFile)
             eprintf("ERROR: Unable to read\n");
             return RET_CANNOTREAD;
         }
+
         dprintf("NT32 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS32));
-        return DoNT32(mapping, *nt32);
+
+        offset += sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER);
+        return DoNT32(mapping, *nt32, offset);
     }
     else if (SizeOfOptionalHeader == sizeof(IMAGE_OPTIONAL_HEADER64))
     {
         g_bIs64Bit = TRUE;
+        dprintf("[IMAGE_NT_HEADERS64 @ 0x%08lX]\n", offset);
+
         MTypedMapView<IMAGE_NT_HEADERS64> nt64;
         nt64 = mapping.GetTypedData<IMAGE_NT_HEADERS64>();
         if (!nt64)
@@ -756,7 +835,9 @@ INT DoMap(HANDLE hFile)
         }
         dprintf("NT64 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS64));
-        return DoNT64(mapping, *nt64);
+
+        offset += sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER);
+        return DoNT64(mapping, *nt64, offset);
     }
 
     eprintf("ERROR: Unknown executable format\n");
@@ -765,7 +846,7 @@ INT DoMap(HANDLE hFile)
 
 ////////////////////////////////////////////////////////////////////////////
 
-INT JustDoIt(const TCHAR *pszFileName)
+static INT JustDoIt(const TCHAR *pszFileName)
 {
     HANDLE hFile;
 
@@ -804,12 +885,12 @@ INT JustDoIt(const TCHAR *pszFileName)
     return ret;
 }
 
-BOOL IsDigit(TCHAR ch)
+static inline BOOL IsDigit(TCHAR ch)
 {
     return TEXT('0') <= ch && ch <= TEXT('9');
 }
 
-DWORDLONG FileTimeToQuad(const FILETIME *pft)
+static inline DWORDLONG FileTimeToQuad(const FILETIME *pft)
 {
     ULARGE_INTEGER uli;
     uli.LowPart = pft->dwLowDateTime;
@@ -817,14 +898,14 @@ DWORDLONG FileTimeToQuad(const FILETIME *pft)
     return uli.QuadPart;
 }
 
-DWORDLONG SystemTimeToQuad(const SYSTEMTIME *pst)
+static inline DWORDLONG SystemTimeToQuad(const SYSTEMTIME *pst)
 {
     FILETIME ft;
     SystemTimeToFileTime(pst, &ft);
     return FileTimeToQuad(&ft);
 }
 
-DWORDLONG LocalTimeToQuad(const SYSTEMTIME *pst)
+static inline DWORDLONG LocalTimeToQuad(const SYSTEMTIME *pst)
 {
     FILETIME ft, ftLocal;
     SystemTimeToFileTime(pst, &ft);
@@ -832,7 +913,7 @@ DWORDLONG LocalTimeToQuad(const SYSTEMTIME *pst)
     return FileTimeToQuad(&ftLocal);
 }
 
-DWORDLONG EpicQuad(void)
+static inline DWORDLONG EpicQuad(void)
 {
     SYSTEMTIME st;
     ZeroMemory(&st, sizeof(st));
@@ -842,12 +923,13 @@ DWORDLONG EpicQuad(void)
     return SystemTimeToQuad(&st);
 }
 
-DWORD QuadToTimeStamp(DWORDLONG quad)
+static inline DWORD QuadToTimeStamp(DWORDLONG quad)
 {
     return (DWORD)((quad - EpicQuad()) / 10000000);
 }
 
-DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst, BOOL bGlobal)
+static inline DWORD
+SystemTimeToTimeStamp(const SYSTEMTIME *pst, BOOL bGlobal)
 {
     DWORDLONG quad;
     if (bGlobal)
@@ -857,15 +939,7 @@ DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst, BOOL bGlobal)
     return QuadToTimeStamp(quad);
 }
 
-void Init(void)
-{
-    g_bIs64Bit = FALSE;
-    g_bVerbose = FALSE;
-    g_dwTimeStamp = 0;
-    g_target = NULL;
-}
-
-INT ParseCommandLine(INT argc, TCHAR **targv)
+static INT ParseCommandLine(INT argc, TCHAR **targv)
 {
     SYSTEMTIME st;
     ZeroMemory(&st, sizeof(st));
@@ -1004,12 +1078,12 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         else
         {
             // file.exe
-            if (g_target)
+            if (g_pszTargetFile)
             {
                 eprintf("ERROR: Target must be one.\n");
                 return RET_INVALIDARG;
             }
-            g_target = arg;
+            g_pszTargetFile = arg;
         }
     }
 
@@ -1038,7 +1112,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         g_dwTimeStamp = SystemTimeToTimeStamp(&st, bGlobal);
     }
 
-    if (g_target == NULL)
+    if (g_pszTargetFile == NULL)
     {
         eprintf("ERROR: No target specified.\n");
         return RET_INVALIDARG;
@@ -1050,7 +1124,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
 extern "C"
 INT _tmain(INT argc, TCHAR **targv)
 {
-    Init();
+    InitApp();
 
     INT ret = ParseCommandLine(argc, targv);
     if (ret == RET_INVALIDARG)
@@ -1069,7 +1143,7 @@ INT _tmain(INT argc, TCHAR **targv)
         return RET_SUCCESS;
     }
 
-    return JustDoIt(g_target);
+    return JustDoIt(g_pszTargetFile);
 }
 
 ////////////////////////////////////////////////////////////////////////////
