@@ -197,9 +197,9 @@ DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbol
 }
 
 static INT
-DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
+DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file, DWORD offset)
 {
-    dprintf("[IMAGE_FILE_HEADER]\n");
+    dprintf("[IMAGE_FILE_HEADER @ 0x%08lX]\n", offset);
     dprintf("Machine: 0x%04X\n", file.Machine);
     dprintf("NumberOfSections: 0x%04X\n", file.NumberOfSections);
     dprintf("TimeDateStamp: 0x%08lX\n", file.TimeDateStamp);
@@ -361,7 +361,7 @@ static INT
 DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
          DWORD res_offset, IMAGE_RESOURCE_DIRECTORY& dir, DWORD pos)
 {
-    dprintf("[IMAGE_RESOURCE_DIRECTORY @ 0x%08lX]: \n", pos);
+    dprintf("[IMAGE_RESOURCE_DIRECTORY @ 0x%08lX]\n", pos);
     dprintf("Characteristics: 0x%08lX\n", dir.Characteristics);
     dprintf("TimeDateStamp: 0x%08lX\n", dir.TimeDateStamp);
     dprintf("MajorVersion: 0x%04X\n", dir.MajorVersion);
@@ -670,7 +670,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
 }
 
 static INT
-DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32, DWORD offset)
+DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32, DWORD nt_offset)
 {
     IMAGE_OPTIONAL_HEADER32& opt32 = nt32.OptionalHeader;
     if (opt32.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC)
@@ -679,7 +679,9 @@ DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32, DWORD offset)
         return RET_INVALIDFORMAT;
     }
 
-    dprintf("[IMAGE_OPTIONAL_HEADER32 @ 0x%08lX]\n", offset);
+    DWORD file_header_offset = nt_offset + sizeof(DWORD);
+    DWORD opt_offset = file_header_offset + sizeof(IMAGE_FILE_HEADER);
+    dprintf("[IMAGE_OPTIONAL_HEADER32 @ 0x%08lX]\n", opt_offset);
     dprintf("ImageBase: 0x%08lX\n", opt32.ImageBase);
     dprintf("SizeOfHeaders: 0x%08lX\n", opt32.SizeOfHeaders);
     dprintf("CheckSum: 0x%08lX\n", opt32.CheckSum);
@@ -692,7 +694,7 @@ DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32, DWORD offset)
     IMAGE_FILE_HEADER& file = nt32.FileHeader;
     WORD NumberOfSections = file.NumberOfSections;
     dprintf("NumberOfSections: 0x%04X\n", NumberOfSections);
-    INT ret = DoFileHeader(mapping, file);
+    INT ret = DoFileHeader(mapping, file, file_header_offset);
     if (ret)
         return ret;
 
@@ -711,7 +713,7 @@ DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32, DWORD offset)
 }
 
 static INT
-DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64, DWORD offset)
+DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64, DWORD nt_offset)
 {
     IMAGE_OPTIONAL_HEADER64& opt64 = nt64.OptionalHeader;
     if (opt64.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
@@ -720,7 +722,9 @@ DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64, DWORD offset)
         return RET_INVALIDFORMAT;
     }
 
-    dprintf("[IMAGE_OPTIONAL_HEADER64 @ 0x%08lX]\n", offset);
+    DWORD file_header_offset = nt_offset + sizeof(DWORD);
+    DWORD opt_offset = file_header_offset + sizeof(IMAGE_FILE_HEADER);
+    dprintf("[IMAGE_OPTIONAL_HEADER64 @ 0x%08lX]\n", opt_offset);
     dprintf("ImageBase: 0x%08lX%08lX\n", HILONG(opt64.ImageBase),
                                          LOLONG(opt64.ImageBase));
     dprintf("SizeOfHeaders: 0x%08lX\n", opt64.SizeOfHeaders);
@@ -734,7 +738,7 @@ DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64, DWORD offset)
     IMAGE_FILE_HEADER& file = nt64.FileHeader;
     WORD NumberOfSections = file.NumberOfSections;
     dprintf("NumberOfSections: 0x%04X\n", NumberOfSections);
-    INT ret = DoFileHeader(mapping, file);
+    INT ret = DoFileHeader(mapping, file, file_header_offset);
     if (ret)
         return ret;
 
@@ -774,6 +778,10 @@ static INT DoMap(HANDLE hFile)
 
         if (dos->e_magic == IMAGE_DOS_SIGNATURE)
         {
+            dprintf("[IMAGE_DOS_HEADER @ 0x%08lX]\n", 0L);
+            dprintf("e_csum: 0x%04X\n", dos->e_csum);
+            dprintf("e_lfanew: 0x%08lX\n", dos->e_lfanew);
+
             // FUCK
             dos->e_csum = 0;
 
@@ -818,7 +826,6 @@ static INT DoMap(HANDLE hFile)
         dprintf("NT32 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS32));
 
-        offset += sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER);
         return DoNT32(mapping, *nt32, offset);
     }
     else if (SizeOfOptionalHeader == sizeof(IMAGE_OPTIONAL_HEADER64))
@@ -836,7 +843,6 @@ static INT DoMap(HANDLE hFile)
         dprintf("NT64 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS64));
 
-        offset += sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER);
         return DoNT64(mapping, *nt64, offset);
     }
 
