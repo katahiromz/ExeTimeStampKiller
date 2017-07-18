@@ -38,7 +38,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9 / 2017.07.18\n"
+    puts("ExeTimeStampKiller Version 0.9.1 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
@@ -530,7 +530,9 @@ DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         dprintf("NumberOfModuleForwarderRefs: 0x%04X\n", desc->NumberOfModuleForwarderRefs);
 
         // FUCK
-        desc->TimeDateStamp = g_dwTimeStamp;
+        // NOTE: We should not change import bound section.
+        //desc->TimeDateStamp = g_dwTimeStamp;
+
         pos += sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR);
 
         DWORD count = desc->NumberOfModuleForwarderRefs;
@@ -553,7 +555,8 @@ DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
             dprintf("Reserved: 0x%04X\n", ref[i].Reserved);
 
             // FUCK
-            ref[i].TimeDateStamp = g_dwTimeStamp;
+            // NOTE: We should not change import bound section.
+            //ref[i].TimeDateStamp = g_dwTimeStamp;
             pos += sizeof(IMAGE_BOUND_FORWARDER_REF);
         }
     }
