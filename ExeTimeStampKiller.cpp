@@ -19,11 +19,12 @@
 
 using namespace std;
 
-////////////////////////////////////////////////////////////////////////////
+BOOL g_bIs64Bit;
+BOOL g_bVerbose;
+DWORD g_dwTimeStamp;
+TCHAR *g_target;
 
-BOOL g_bIs64Bit = FALSE;
-BOOL g_bVerbose = FALSE;
-DWORD g_dwTimeStamp = 0;
+////////////////////////////////////////////////////////////////////////////
 
 void eprintf(const char *fmt, ...)
 {
@@ -53,13 +54,14 @@ void dprintf(const char *fmt, ...)
     fflush(stderr);
 }
 
-enum EXITCODE
+enum RETURNCODE
 {
-    EC_SUCCESS = 0,
-    EC_CANNOTOPEN,
-    EC_CANNOTREAD,
-    EC_INVALIDFORMAT,
-    EC_INVALIDARG
+    RET_SUCCESS = 0,
+    RET_CANNOTOPEN,
+    RET_CANNOTREAD,
+    RET_INVALIDFORMAT,
+    RET_INVALIDARG,
+    RET_SHOWHELP
 };
 
 ////////////////////////////////////////////////////////////////////////////
@@ -151,14 +153,14 @@ struct SECTION_INFO
 INT DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 {
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
-        return EC_SUCCESS;
+        return RET_SUCCESS;
 
     DWORDLONG pos = mapping.GetPos64();
 
     // FIXME
     mapping.Seek64(pos, TRUE);
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
@@ -183,7 +185,7 @@ INT DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file)
             return ret;
     }
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -194,7 +196,7 @@ INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
     if (!exp)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     dprintf("[IMAGE_EXPORT_DIRECTORY @ 0x%08lX]\n", offset);
@@ -211,7 +213,7 @@ INT DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
     dprintf("AddressOfNameOrdinals: 0x08lX\n", exp->AddressOfNameOrdinals);
 
     exp->TimeDateStamp = g_dwTimeStamp;
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -224,7 +226,7 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
     if (!imp)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     for (DWORD i = 0; i < count; ++i)
@@ -234,7 +236,7 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
         if (!desc)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
 
         dprintf("[IMAGE_IMPORT_DESCRIPTOR #%lu @ 0x%08lX]\n", i, mapping.GetPos());
@@ -252,7 +254,7 @@ INT DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
         mapping.Seek64(sizeof(IMAGE_IMPORT_DESCRIPTOR));
     }
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
@@ -287,7 +289,7 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
         if (!dir)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
 
         return DoResDir(mapping, sec_info, res_offset, *dir, pos);
@@ -304,12 +306,12 @@ INT DoResEnt(MFileMapping& mapping, SECTION_INFO& sec_info,
         if (!data)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
 
         // FIXME
 
-        return EC_SUCCESS;
+        return RET_SUCCESS;
     }
 }
 
@@ -329,7 +331,7 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
 
     DWORD num_entries = dir.NumberOfNamedEntries + dir.NumberOfIdEntries;
     if (num_entries == 0)
-        return EC_SUCCESS;
+        return RET_SUCCESS;
 
     DWORD ent_size = num_entries * sizeof(IMAGE_RESOURCE_DIRECTORY_ENTRY);
     MTypedMapView<IMAGE_RESOURCE_DIRECTORY_ENTRY> entries;
@@ -337,7 +339,7 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
     if (!entries)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     for (DWORD i = 0; i < num_entries; ++i)
@@ -349,7 +351,7 @@ INT DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
             return ret;
     }
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD size)
@@ -361,7 +363,7 @@ INT DoRes(MFileMapping& mapping, SECTION_INFO& sec_info, DWORD offset, DWORD siz
     if (!dir)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     return DoResDir(mapping, sec_info, offset, *dir, offset);
@@ -376,11 +378,11 @@ INT DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
     if (!config)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     config->TimeDateStamp = g_dwTimeStamp;
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -392,11 +394,11 @@ INT DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
     if (!config)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     config->TimeDateStamp = g_dwTimeStamp;
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoLoadConfig(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -422,7 +424,7 @@ INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
     if (!debug)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     for (DWORD i = 0; i < count; ++i)
@@ -439,7 +441,7 @@ INT DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
         debug[i].TimeDateStamp = g_dwTimeStamp;
     }
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -458,7 +460,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         if (!desc)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
 
         dprintf("[IMAGE_BOUND_IMPORT_DESCRIPTOR @ 0x%08lX]\n", pos);
@@ -479,7 +481,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         if (!ref)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
         for (DWORD i = 0; i < count; ++i)
         {
@@ -493,7 +495,7 @@ INT DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         }
     }
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -505,12 +507,12 @@ INT DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
     if (!descr)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     descr->dwTimeStamp = 0;
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
@@ -599,7 +601,7 @@ INT DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         dprintf("DoDelayImp done.\n");
     }
 
-    return EC_SUCCESS;
+    return RET_SUCCESS;
 }
 
 INT DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32)
@@ -608,7 +610,7 @@ INT DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32)
     if (opt32.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC)
     {
         eprintf("ERROR: Invalid executable file\n");
-        return EC_INVALIDFORMAT;
+        return RET_INVALIDFORMAT;
     }
     opt32.CheckSum = 0;
 
@@ -624,7 +626,7 @@ INT DoNT32(MFileMapping& mapping, IMAGE_NT_HEADERS32& nt32)
     if (!sections)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     SECTION_INFO sec_info(opt32.SizeOfHeaders, sections, NumberOfSections);
@@ -637,7 +639,7 @@ INT DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64)
     if (opt64.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
     {
         eprintf("ERROR: Invalid executable file\n");
-        return EC_INVALIDFORMAT;
+        return RET_INVALIDFORMAT;
     }
     opt64.CheckSum = 0;
 
@@ -653,7 +655,7 @@ INT DoNT64(MFileMapping& mapping, IMAGE_NT_HEADERS64& nt64)
     if (!sections)
     {
         eprintf("ERROR: Unable to read\n");
-        return EC_CANNOTREAD;
+        return RET_CANNOTREAD;
     }
 
     SECTION_INFO sec_info(opt64.SizeOfHeaders, sections, NumberOfSections);
@@ -667,7 +669,7 @@ INT DoMap(HANDLE hFile)
     if (!mapping.CreateFileMapping(hFile))
     {
         eprintf("ERROR: Unable to open file\n");
-        return EC_CANNOTOPEN;
+        return RET_CANNOTOPEN;
     }
     dprintf("Mapped.\n");
 
@@ -677,7 +679,7 @@ INT DoMap(HANDLE hFile)
         if (!dos)
         {
             eprintf("ERROR: Invalid executable file\n");
-            return EC_INVALIDFORMAT;
+            return RET_INVALIDFORMAT;
         }
 
         if (dos->e_magic == IMAGE_DOS_SIGNATURE)
@@ -694,13 +696,13 @@ INT DoMap(HANDLE hFile)
         if (!nt32)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
         dprintf("NT Header done.\n");
         if (nt32->Signature != IMAGE_NT_SIGNATURE)
         {
             eprintf("ERROR: Invalid executable file\n");
-            return EC_INVALIDFORMAT;
+            return RET_INVALIDFORMAT;
         }
         SizeOfOptionalHeader = nt32->FileHeader.SizeOfOptionalHeader;
         dprintf("SizeOfOptionalHeader: %d.\n", SizeOfOptionalHeader);
@@ -714,7 +716,7 @@ INT DoMap(HANDLE hFile)
         if (!nt32)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
         dprintf("NT32 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS32));
@@ -728,7 +730,7 @@ INT DoMap(HANDLE hFile)
         if (!nt64)
         {
             eprintf("ERROR: Unable to read\n");
-            return EC_CANNOTREAD;
+            return RET_CANNOTREAD;
         }
         dprintf("NT64 done.\n");
         mapping.Seek64(sizeof(IMAGE_NT_HEADERS64));
@@ -736,7 +738,7 @@ INT DoMap(HANDLE hFile)
     }
 
     eprintf("ERROR: Unknown executable format\n");
-    return EC_INVALIDFORMAT;
+    return RET_INVALIDFORMAT;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -756,7 +758,7 @@ INT JustDoIt(const TCHAR *pszFileName)
     if (hFile == INVALID_HANDLE_VALUE)
     {
         eprintf("ERROR: Unable to open file\n");
-        return EC_CANNOTOPEN;
+        return RET_CANNOTOPEN;
     }
     dprintf("Opened.\n");
 
@@ -776,56 +778,265 @@ INT JustDoIt(const TCHAR *pszFileName)
     return ret;
 }
 
-extern "C"
-INT _tmain(INT argc, TCHAR **targv)
+BOOL IsDigit(TCHAR ch)
 {
-    TCHAR *target = NULL;
+    return TEXT('0') <= ch && ch <= TEXT('9');
+}
 
+DWORDLONG FileTimeToQuad(const FILETIME *pft)
+{
+    ULARGE_INTEGER uli;
+    uli.LowPart = pft->dwLowDateTime;
+    uli.HighPart = pft->dwHighDateTime;
+    return uli.QuadPart;
+}
+
+DWORDLONG SystemTimeToQuad(const SYSTEMTIME *pst)
+{
+    FILETIME ft;
+    SystemTimeToFileTime(pst, &ft);
+    return FileTimeToQuad(&ft);
+}
+
+DWORDLONG EpicQuad(void)
+{
+    SYSTEMTIME st;
+    ZeroMemory(&st, sizeof(st));
+    st.wYear = 1970;
+    st.wMonth = 1;
+    st.wDay = 1;
+    return SystemTimeToQuad(&st);
+}
+
+DWORD QuadToTimeStamp(DWORDLONG quad)
+{
+    return (DWORD)((quad - EpicQuad()) / 10000000);
+}
+
+DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst)
+{
+    DWORDLONG quad = SystemTimeToQuad(pst);
+    return QuadToTimeStamp(quad);
+}
+
+void ShowHelp(void)
+{
+    printf("Usage: ExeTimestampKiller [options] file.exe\n");
+    printf("Options:");
+    printf("-v              Verbose.\n");
+    printf("-x XXXXXXXX     Set hexidemical timestamp value to set.\n");
+    printf("-n              Set now.\n");
+    printf("-d YYYYMMDD     Set date.\n");
+    printf("-t HHmmss       Set time.\n");
+    printf("-t HHmmss.uuu   Set time with milliseconds.\n");
+    printf("--help          Show this help.\n");
+}
+
+VOID Init(VOID)
+{
+    g_bIs64Bit = FALSE;
     g_bVerbose = FALSE;
     g_dwTimeStamp = 0;
-    BOOL bInvalidArg = FALSE;
+    g_target = NULL;
+}
 
+INT ParseCommandLine(INT argc, TCHAR **targv)
+{
+    SYSTEMTIME st;
+    ZeroMemory(&st, sizeof(st));
+
+    BOOL bSetNow = FALSE;
+    BOOL bSetDate = FALSE;
+    BOOL bSetTime = FALSE;
     for (int i = 1; i < argc; ++i)
     {
-        if (lstrcmp(targv[i], TEXT("-v")) == 0)
+        TCHAR *arg = targv[i];
+        if (lstrcmp(arg, TEXT("-v")) == 0)
         {
             g_bVerbose = TRUE;
         }
-        else if (lstrcmp(targv[i], TEXT("-s")) == 0)
+        else if (lstrcmp(arg, TEXT("-x")) == 0)
         {
             if (i + 1 < argc)
             {
+                arg = targv[i + 1];
+                ++i;
+
                 TCHAR *endptr;
                 DWORD dw = _tcstoul(targv[i + 1], &endptr, 16);
-                if (*endptr == 0)
-                    g_dwTimeStamp = dw;
-                else
-                    bInvalidArg = TRUE;
-                ++i;
+                if (*endptr != 0)
+                {
+                    eprintf("ERROR: invalid '-x' parameter.\n");
+                    return RET_INVALIDARG;
+                }
+                g_dwTimeStamp = dw;
             }
             else
             {
-                bInvalidArg = TRUE;
+                eprintf("ERROR: '-x' needs a parameter.\n");
+                return RET_INVALIDARG;
             }
+        }
+        else if (lstrcmp(arg, TEXT("-n")) == 0)
+        {
+            SYSTEMTIME st;
+            GetSystemTime(&st);
+            g_dwTimeStamp = SystemTimeToTimeStamp(&st);
+            bSetNow = TRUE;
+        }
+        else if (lstrcmp(arg, TEXT("-d")) == 0)
+        {
+            // -d YYYYMMDD
+            if (i + 1 < argc)
+            {
+                arg = targv[i + 1];
+                ++i;
+                if (lstrlen(arg) != 8)
+                {
+                    eprintf("ERROR: Invalid '-d' parameter.\n");
+                    return RET_INVALIDARG;
+                }
+                for (int k = 0; k < 8; ++k)
+                {
+                    if (!IsDigit(arg[k]))
+                    {
+                        eprintf("ERROR: Invalid '-d' parameter.\n");
+                        return RET_INVALIDARG;
+                    }
+                }
+                DWORD dw = _tcstoul(arg, NULL, 10);
+                st.wDay = WORD(dw % 100);
+                st.wMonth = WORD((dw / 100) % 100);
+                st.wYear = WORD(dw / 10000);
+                bSetDate = TRUE;
+            }
+            else
+            {
+                eprintf("ERROR: '-d' needs a parameter.\n");
+                return RET_INVALIDARG;
+            }
+        }
+        else if (lstrcmp(arg, TEXT("-t")) == 0)
+        {
+            // -t HHmmss or -t HHmmss.uuu
+            if (i + 1 < argc)
+            {
+                arg = targv[i + 1];
+                ++i;
+                if (lstrlen(arg) == 6)
+                {
+                    for (int k = 0; k < 6; ++k)
+                    {
+                        if (!IsDigit(arg[k]))
+                        {
+                            eprintf("ERROR: Invalid '-t' parameter.\n");
+                            return RET_INVALIDARG;
+                        }
+                    }
+                    DWORD dw = _tcstoul(arg, NULL, 10);
+                    st.wHour = WORD(dw / 10000);
+                    st.wMinute = WORD((dw / 100) % 100);
+                    st.wSecond = WORD(dw % 100);
+                    bSetTime = TRUE;
+                }
+                else if (lstrlen(arg) == 10)
+                {
+                    for (int k = 0; k < 10; ++k)
+                    {
+                        if (k == 6 && arg[k] == TEXT('.'))
+                            continue;
+
+                        if (!IsDigit(arg[k]))
+                        {
+                            eprintf("ERROR: Invalid '-t' parameter.\n");
+                            return RET_INVALIDARG;
+                        }
+                    }
+                    DWORD dw = _tcstoul(arg, NULL, 10);
+                    st.wHour = WORD(dw / 10000);
+                    st.wMinute = WORD((dw / 100) % 100);
+                    st.wSecond = WORD(dw % 100);
+                    dw = _tcstoul(&arg[7], NULL, 10);
+                    st.wMilliseconds = WORD(dw);
+                    bSetTime = TRUE;
+                }
+                else
+                {
+                    eprintf("ERROR: Invalid '-t' parameter.\n");
+                    return RET_INVALIDARG;
+                }
+            }
+            else
+            {
+                eprintf("ERROR: '-t' needs a parameter.\n");
+                return RET_INVALIDARG;
+            }
+        }
+        else if (lstrcmp(arg, TEXT("--help")) == 0)
+        {
+            return RET_SHOWHELP;
+        }
+        else if (arg[0] == TEXT('-'))
+        {
+            eprintf("ERROR: Invalid argument.\n");
+            return RET_INVALIDARG;
         }
         else
         {
-            if (target == NULL)
-                target = targv[i];
-            else
-                bInvalidArg = TRUE;
+            if (g_target)
+            {
+                eprintf("ERROR: Target must be one.\n");
+                return RET_INVALIDARG;
+            }
+            g_target = arg;
         }
     }
 
-    if (target == NULL || bInvalidArg)
+    if (bSetDate || bSetTime)
     {
-        printf("Usage: ExeTimestampKiller [-v] [-s HEX] file.exe\n");
-        printf("-v       Verbose.\n");
-        printf("-s HEX   Set hexidemical timestamp value to set.\n");
-        return EC_INVALIDARG;
+        if (bSetNow)
+        {
+            eprintf("ERROR: '-n' and '-d'/'-t' are exclusive.\n");
+            return RET_INVALIDARG;
+        }
+        if (!bSetDate)
+        {
+            SYSTEMTIME stNow;
+            GetSystemTime(&stNow);
+            st.wYear = stNow.wYear;
+            st.wMonth = stNow.wMonth;
+            st.wDay = stNow.wDay;
+        }
+        g_dwTimeStamp = SystemTimeToTimeStamp(&st);
     }
 
-    return JustDoIt(target);
+    if (g_target == NULL)
+    {
+        eprintf("ERROR: No target specified.\n");
+        return RET_INVALIDARG;
+    }
+
+    return RET_SUCCESS;
+}
+
+extern "C"
+INT _tmain(INT argc, TCHAR **targv)
+{
+    Init();
+
+    INT ret = ParseCommandLine(argc, targv);
+    if (ret == RET_INVALIDARG)
+    {
+        ShowHelp();
+        return ret;
+    }
+    if (ret == RET_SHOWHELP)
+    {
+        ShowHelp();
+        return RET_SUCCESS;
+    }
+
+    return JustDoIt(g_target);
 }
 
 ////////////////////////////////////////////////////////////////////////////
