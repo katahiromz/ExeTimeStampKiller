@@ -34,11 +34,12 @@ void ShowVersion(void)
 void ShowHelp(void)
 {
     printf("Usage: ExeTimestampKiller [options] file.exe\n");
-    printf("Options:\n");
+    printf("\nOptions:\n");
     printf("-n              Set now.\n");
     printf("-d YYYYMMDD     Set date.\n");
     printf("-t HHmmss       Set time.\n");
     printf("-v              Verbose output.\n");
+    printf("-g              Parse as global time.\n");
     printf("-x XXXXXXXX     Set hexidemical timestamp value to set.\n");
     printf("--help          Show this help.\n");
     printf("--version       Show version.\n");
@@ -823,6 +824,14 @@ DWORDLONG SystemTimeToQuad(const SYSTEMTIME *pst)
     return FileTimeToQuad(&ft);
 }
 
+DWORDLONG LocalTimeToQuad(const SYSTEMTIME *pst)
+{
+    FILETIME ft, ftLocal;
+    SystemTimeToFileTime(pst, &ft);
+    LocalFileTimeToFileTime(&ft, &ftLocal);
+    return FileTimeToQuad(&ftLocal);
+}
+
 DWORDLONG EpicQuad(void)
 {
     SYSTEMTIME st;
@@ -838,9 +847,13 @@ DWORD QuadToTimeStamp(DWORDLONG quad)
     return (DWORD)((quad - EpicQuad()) / 10000000);
 }
 
-DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst)
+DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst, BOOL bGlobal)
 {
-    DWORDLONG quad = SystemTimeToQuad(pst);
+    DWORDLONG quad;
+    if (bGlobal)
+        quad = SystemTimeToQuad(pst);
+    else
+        quad = LocalTimeToQuad(pst);
     return QuadToTimeStamp(quad);
 }
 
@@ -858,6 +871,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
     ZeroMemory(&st, sizeof(st));
 
     BOOL bSetNow = FALSE, bSetDate = FALSE, bSetTime = FALSE;
+    BOOL bSetHex = FALSE, bGlobal = FALSE;
     for (int i = 1; i < argc; ++i)
     {
         TCHAR *arg = targv[i];
@@ -871,6 +885,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
             // -x XXXXXXXX
             if (i + 1 < argc)
             {
+                bSetHex = TRUE;
                 arg = targv[i + 1];
                 ++i;
 
@@ -962,6 +977,11 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
                 return RET_INVALIDARG;
             }
         }
+        else if (lstrcmp(arg, TEXT("-g")) == 0)
+        {
+            // -g
+            bGlobal = TRUE;
+        }
         else if (lstrcmp(arg, TEXT("--help")) == 0)
         {
             // --help
@@ -993,12 +1013,14 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         }
     }
 
-    if ((bSetDate || bSetTime) && bSetNow)
+    if ((bSetDate || bSetTime || bSetHex) && bSetNow)
     {
         if (bSetDate)
             eprintf("ERROR: '-n' and '-d' are exclusive.\n");
-        else
+        else if (bSetTime)
             eprintf("ERROR: '-n' and '-t' are exclusive.\n");
+        else if (bSetHex)
+            eprintf("ERROR: '-n' and '-x' are exclusive.\n");
         return RET_INVALIDARG;
     }
 
@@ -1013,7 +1035,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
 
     if (bSetDate || bSetTime || bSetNow)
     {
-        g_dwTimeStamp = SystemTimeToTimeStamp(&st);
+        g_dwTimeStamp = SystemTimeToTimeStamp(&st, bGlobal);
     }
 
     if (g_target == NULL)
