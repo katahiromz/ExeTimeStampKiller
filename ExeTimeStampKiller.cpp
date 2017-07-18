@@ -859,10 +859,12 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         TCHAR *arg = targv[i];
         if (lstrcmp(arg, TEXT("-v")) == 0)
         {
+            // -v
             g_bVerbose = TRUE;
         }
         else if (lstrcmp(arg, TEXT("-x")) == 0)
         {
+            // -x XXXXXXXX
             if (i + 1 < argc)
             {
                 arg = targv[i + 1];
@@ -885,9 +887,8 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         }
         else if (lstrcmp(arg, TEXT("-n")) == 0)
         {
-            SYSTEMTIME st;
+            // -n
             GetSystemTime(&st);
-            g_dwTimeStamp = SystemTimeToTimeStamp(&st);
             bSetNow = TRUE;
         }
         else if (lstrcmp(arg, TEXT("-d")) == 0)
@@ -959,10 +960,12 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         }
         else if (lstrcmp(arg, TEXT("--help")) == 0)
         {
+            // --help
             return RET_SHOWHELP;
         }
         else if (lstrcmp(arg, TEXT("--version")) == 0)
         {
+            // --version
             return RET_SHOWVERSION;
         }
         else if (arg[0] == TEXT('-'))
@@ -972,6 +975,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         }
         else
         {
+            // file.exe
             if (g_target)
             {
                 eprintf("ERROR: Target must be one.\n");
@@ -981,21 +985,26 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         }
     }
 
-    if (bSetDate || bSetTime)
+    if ((bSetDate || bSetTime) && bSetNow)
     {
-        if (bSetNow)
-        {
-            eprintf("ERROR: '-n' and '-d'/'-t' are exclusive.\n");
-            return RET_INVALIDARG;
-        }
-        if (!bSetDate)
-        {
-            SYSTEMTIME stNow;
-            GetSystemTime(&stNow);
-            st.wYear = stNow.wYear;
-            st.wMonth = stNow.wMonth;
-            st.wDay = stNow.wDay;
-        }
+        if (bSetDate)
+            eprintf("ERROR: '-n' and '-d' are exclusive.\n");
+        else
+            eprintf("ERROR: '-n' and '-t' are exclusive.\n");
+        return RET_INVALIDARG;
+    }
+
+    if (!bSetDate && bSetTime)
+    {
+        SYSTEMTIME stNow;
+        GetSystemTime(&stNow);
+        st.wYear = stNow.wYear;
+        st.wMonth = stNow.wMonth;
+        st.wDay = stNow.wDay;
+    }
+
+    if (bSetDate || bSetTime || bSetNow)
+    {
         g_dwTimeStamp = SystemTimeToTimeStamp(&st);
     }
 
