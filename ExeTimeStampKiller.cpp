@@ -828,7 +828,6 @@ void ShowHelp(void)
     printf("-n              Set now.\n");
     printf("-d YYYYMMDD     Set date.\n");
     printf("-t HHmmss       Set time.\n");
-    printf("-t HHmmss.uuu   Set time with milliseconds.\n");
     printf("--help          Show this help.\n");
 }
 
@@ -845,9 +844,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
     SYSTEMTIME st;
     ZeroMemory(&st, sizeof(st));
 
-    BOOL bSetNow = FALSE;
-    BOOL bSetDate = FALSE;
-    BOOL bSetTime = FALSE;
+    BOOL bSetNow = FALSE, bSetDate = FALSE, bSetTime = FALSE;
     for (int i = 1; i < argc; ++i)
     {
         TCHAR *arg = targv[i];
@@ -918,7 +915,7 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
         }
         else if (lstrcmp(arg, TEXT("-t")) == 0)
         {
-            // -t HHmmss or -t HHmmss.uuu
+            // -t HHmmss
             if (i + 1 < argc)
             {
                 arg = targv[i + 1];
@@ -937,27 +934,6 @@ INT ParseCommandLine(INT argc, TCHAR **targv)
                     st.wHour = WORD(dw / 10000);
                     st.wMinute = WORD((dw / 100) % 100);
                     st.wSecond = WORD(dw % 100);
-                    bSetTime = TRUE;
-                }
-                else if (lstrlen(arg) == 10)
-                {
-                    for (int k = 0; k < 10; ++k)
-                    {
-                        if (k == 6 && arg[k] == TEXT('.'))
-                            continue;
-
-                        if (!IsDigit(arg[k]))
-                        {
-                            eprintf("ERROR: Invalid '-t' parameter.\n");
-                            return RET_INVALIDARG;
-                        }
-                    }
-                    DWORD dw = _tcstoul(arg, NULL, 10);
-                    st.wHour = WORD(dw / 10000);
-                    st.wMinute = WORD((dw / 100) % 100);
-                    st.wSecond = WORD(dw % 100);
-                    dw = _tcstoul(&arg[7], NULL, 10);
-                    st.wMilliseconds = WORD(dw);
                     bSetTime = TRUE;
                 }
                 else
