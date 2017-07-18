@@ -26,7 +26,7 @@ TCHAR *g_target;
 
 void ShowVersion(void)
 {
-    printf("ExeTimeStampKiller Version 0.5 / 2017.07.18\n");
+    printf("ExeTimeStampKiller Version 0.6 / 2017.07.18\n");
     printf("Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n");
     printf("This software is public domain software (PDS).\n");
 }
