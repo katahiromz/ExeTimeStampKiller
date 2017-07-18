@@ -24,7 +24,7 @@ BOOL g_bVerbose;
 DWORD g_dwTimeStamp;
 TCHAR *g_target;
 
-VOID ShowVersion(VOID)
+void ShowVersion(void)
 {
     printf("ExeTimeStampKiller Version 0.3 / 2017.07.18\n");
     printf("Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n");
@@ -840,7 +840,7 @@ DWORD SystemTimeToTimeStamp(const SYSTEMTIME *pst)
     return QuadToTimeStamp(quad);
 }
 
-VOID Init(VOID)
+void Init(void)
 {
     g_bIs64Bit = FALSE;
     g_bVerbose = FALSE;
