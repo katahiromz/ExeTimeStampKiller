@@ -211,8 +211,9 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 
             if (StorageClass == IMAGE_SYM_CLASS_SECTION)
             {
+                // No effect.
                 // FUCK
-                aux->Section.CheckSum = 0;
+                //aux->Section.CheckSum = 0;
             }
 
             --NumberOfAuxSymbols;
@@ -665,7 +666,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
             return ret;
         dprintf("DoImp done.\n");
     }
-#endif
+#endif  // def USELESS_FUNCTIONS
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_RESOURCE];
     offset = sec_info.OffsetFromRVA(data->VirtualAddress);
@@ -711,7 +712,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
             return ret;
         dprintf("DoBoundImp done.\n");
     }
-#endif
+#endif  // def USELESS_FUNCTIONS
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT];
     offset = sec_info.OffsetFromRVA(data->VirtualAddress);
