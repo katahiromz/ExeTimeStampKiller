@@ -302,6 +302,7 @@ DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
 
     // FUCK
     exp->TimeDateStamp = g_dwTimeStamp;
+
     return RET_SUCCESS;
 }
 
@@ -483,6 +484,7 @@ DoLoadConfig32(MFileMapping& mapping, DWORD offset, DWORD size)
 
     // FUCK
     config->TimeDateStamp = g_dwTimeStamp;
+
     return RET_SUCCESS;
 }
 
@@ -501,6 +503,7 @@ DoLoadConfig64(MFileMapping& mapping, DWORD offset, DWORD size)
 
     // FUCK
     config->TimeDateStamp = g_dwTimeStamp;
+
     return RET_SUCCESS;
 }
 
