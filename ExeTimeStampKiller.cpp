@@ -38,7 +38,7 @@ static void ShowVersion(void)
 {
     puts("ExeTimeStampKiller Version 0.9.7 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
-         "This software is public domain software (PDS).\n");
+         "This software is public domain software (PDS).");
 }
 
 static void ShowHelp(void)
@@ -52,7 +52,7 @@ static void ShowHelp(void)
          "-g              Parse as global time.\n"
          "-x XXXXXXXX     Set hexidemical timestamp value to set.\n"
          "--help          Show this help.\n"
-         "--version       Show version.\n");
+         "--version       Show version.");
 }
 
 ////////////////////////////////////////////////////////////////////////////
