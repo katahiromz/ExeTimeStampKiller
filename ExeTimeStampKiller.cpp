@@ -36,7 +36,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.6 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.7 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
@@ -1032,7 +1032,7 @@ static INT ParseCommandLine(INT argc, TCHAR **targv)
                 ++i;
 
                 TCHAR *endptr;
-                DWORD dw = _tcstoul(targv[i + 1], &endptr, 16);
+                DWORD dw = _tcstoul(arg, &endptr, 16);
                 if (*endptr != 0)
                 {
                     eprintf("ERROR: invalid '-x' parameter.\n");
