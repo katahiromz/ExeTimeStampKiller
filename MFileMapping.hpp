@@ -155,11 +155,13 @@ public:
 
     DWORD SetPos(DWORD dwOffsetHigh, DWORD dwOffsetLow)
     {
-        return Seek(dwOffsetHigh, dwOffsetLow, TRUE);
+        m_index = MAKELONGLONG(dwOffsetLow, dwOffsetHigh);
+        return m_index;
     }
     DWORDLONG SetPos64(DWORDLONG offset)
     {
-        return Seek64(offset, TRUE);
+        m_index = offset;
+        return m_index;
     }
 
     MMapView MapViewDx(DWORD dwOffsetHigh = 0, DWORD dwOffsetLow = 0,
