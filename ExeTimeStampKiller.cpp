@@ -36,14 +36,14 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.2 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.3 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
 
 static void ShowHelp(void)
 {
-    puts("Usage: ExeTimestampKiller [options] file.exe\n"
+    puts("Usage: ExeTimeStampKiller [options] file.exe\n"
          "\nOptions:\n"
          "-n              Set now.\n"
          "-d YYYYMMDD     Set date.\n"
@@ -199,6 +199,7 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
         return RET_CANNOTREAD;
     }
 
+    DWORD StorageClass = IMAGE_SYM_CLASS_NULL;
     DWORD NumberOfAuxSymbols = 0;
     for (DWORD i = 0; i < NumberOfSymbols; ++i)
     {
@@ -208,8 +209,11 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 
             dprintf("[IMAGE_AUX_SYMBOL #%lu @ 0x%08lX]\n", i, offset);
 
-            // FUCK
-            //aux.CheckSum = 0;     // FIXME
+            if (StorageClass == IMAGE_SYM_CLASS_SECTION)
+            {
+                // FUCK
+                aux.Section.CheckSum = 0;
+            }
 
             --NumberOfAuxSymbols;
         }
@@ -222,6 +226,7 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
             dprintf("StorageClass: 0x%02X\n", symbols[i].StorageClass);
             dprintf("NumberOfAuxSymbols: 0x%02X\n", symbols[i].NumberOfAuxSymbols);
 
+            StorageClass = symbols[i].StorageClass;
             NumberOfAuxSymbols = symbols[i].NumberOfAuxSymbols;
         }
         offset += sizeof(IMAGE_SYMBOL);
@@ -558,7 +563,7 @@ DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
         dprintf("NumberOfModuleForwarderRefs: 0x%04X\n", desc->NumberOfModuleForwarderRefs);
 
         // FUCK
-        // NOTE: We should not change import bound section.
+        // NOTE: We should not change bound import section.
         //desc->TimeDateStamp = g_dwTimeStamp;
 
         pos += sizeof(IMAGE_BOUND_IMPORT_DESCRIPTOR);
@@ -583,8 +588,9 @@ DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
             dprintf("Reserved: 0x%04X\n", ref[i].Reserved);
 
             // FUCK
-            // NOTE: We should not change import bound section.
+            // NOTE: We should not change bound import section.
             //ref[i].TimeDateStamp = g_dwTimeStamp;
+
             pos += sizeof(IMAGE_BOUND_FORWARDER_REF);
         }
     }
