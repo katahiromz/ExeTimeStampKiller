@@ -24,7 +24,6 @@ using namespace std;
 static BOOL   g_bIs64Bit            = FALSE;
 static BOOL   g_bVerbose            = FALSE;
 static DWORD  g_dwTimeStamp         = 0;
-static DWORD  g_dwFileHeaderFlags   = 0;
 static TCHAR *g_pszTargetFile       = NULL;
 
 static void InitApp(void)
@@ -32,7 +31,6 @@ static void InitApp(void)
     g_bIs64Bit = FALSE;
     g_bVerbose = FALSE;
     g_dwTimeStamp = 0;
-    g_dwFileHeaderFlags = 0;
     g_pszTargetFile = NULL;
 }
 
@@ -185,13 +183,49 @@ struct SECTION_INFO
 ////////////////////////////////////////////////////////////////////////////
 
 static INT
-DoSymbol(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
+DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 {
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
         return RET_SUCCESS;
 
-    // FUCK
-    eprintf("FIXME: IMAGE_AUX_SYMBOL.CheckSum\n");
+    DOWRD offset = PointerToSymbolTable;
+
+    DWORD size = NumberOfSymbols * sizeof(IMAGE_SYMBOL);
+    mapping.SetPos(offset);
+    MTypedMapView<IMAGE_SYMBOL> symbols = mapping.GetTypedData<IMAGE_SYMBOL>(size);
+    if (!symbols)
+    {
+        eprintf("ERROR: Unable to read\n");
+        return RET_CANNOTREAD;
+    }
+
+    DWORD NumberOfAuxSymbols = 0;
+    for (DWORD i = 0; i < NumberOfSymbols; ++i)
+    {
+        if (NumberOfAuxSymbols)
+        {
+            IMAGE_AUX_SYMBOL& aux = (IMAGE_AUX_SYMBOL&)symbols[i];
+
+            dprintf("[IMAGE_AUX_SYMBOL #%lu @ 0x%08lX]\n", i, offset);
+
+            // FUCK
+            //aux.CheckSum = 0;     // FIXME
+
+            --NumberOfAuxSymbols;
+        }
+        else
+        {
+            dprintf("[IMAGE_SYMBOL #%lu @ 0x%08lX]\n", i, offset);
+            dprintf("Value: 0x%08lX\n", symbols[i].Value);
+            dprintf("SectionNumber: 0x%04X\n", symbols[i].SectionNumber);
+            dprintf("Type: 0x%04X\n", symbols[i].Type);
+            dprintf("StorageClass: 0x%02X\n", symbols[i].StorageClass);
+            dprintf("NumberOfAuxSymbols: 0x%02X\n", symbols[i].NumberOfAuxSymbols);
+
+            NumberOfAuxSymbols = symbols[i].NumberOfAuxSymbols;
+        }
+        offset += sizeof(IMAGE_SYMBOL);
+    }
 
     return RET_SUCCESS;
 }
@@ -207,7 +241,6 @@ DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file, DWORD offset)
     dprintf("NumberOfSymbols: 0x%08lX\n", file.NumberOfSymbols);
     dprintf("SizeOfOptionalHeader: 0x%04X\n", file.SizeOfOptionalHeader);
     dprintf("Characteristics: 0x%04X\n", file.Characteristics);
-    g_dwFileHeaderFlags = file.Characteristics;
 
     // FUCK
     file.TimeDateStamp = g_dwTimeStamp;
@@ -216,7 +249,7 @@ DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file, DWORD offset)
     DWORD NumberOfSymbols = file.NumberOfSymbols;
     if (NumberOfSymbols)
     {
-        INT ret = DoSymbol(mapping, PointerToSymbolTable, NumberOfSymbols);
+        INT ret = DoSym(mapping, PointerToSymbolTable, NumberOfSymbols);
         if (ret)
             return ret;
     }
@@ -470,13 +503,6 @@ DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
     mapping.SetPos64(offset);
 
     DWORD count = size / sizeof(IMAGE_DEBUG_DIRECTORY);
-
-    if (g_dwFileHeaderFlags & IMAGE_FILE_DEBUG_STRIPPED)
-    {
-        eprintf("FIXME: IMAGE_SEPARATE_DEBUG_HEADER\n");
-        return RET_SUCCESS;
-    }
-
     MTypedMapView<IMAGE_DEBUG_DIRECTORY> debug;
     debug = mapping.GetTypedData<IMAGE_DEBUG_DIRECTORY>(size);
     if (!debug)
@@ -487,7 +513,7 @@ DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
 
     for (DWORD i = 0; i < count; ++i)
     {
-        dprintf("[IMAGE_DEBUG_DIRECTORY #%lu]\n", i);
+        dprintf("[IMAGE_DEBUG_DIRECTORY #%lu @ 0xs%08lX]\n", i, offset);
         dprintf("Characteristics: 0x%08lX\n", debug[i].Characteristics);
         dprintf("TimeDateStamp: 0x%08lX\n", debug[i].TimeDateStamp);
         dprintf("MajorVersion: 0x%04X\n", debug[i].MajorVersion);
@@ -499,6 +525,8 @@ DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
 
         // FUCK
         debug[i].TimeDateStamp = g_dwTimeStamp;
+
+        offset += sizeof(IMAGE_DEBUG_DIRECTORY);
     }
 
     return RET_SUCCESS;
