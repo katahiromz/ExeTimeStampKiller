@@ -36,7 +36,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.4 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.5 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
@@ -619,6 +619,7 @@ DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
         return RET_CANNOTREAD;
     }
 
+    // FUCK
     descr->dwTimeStamp = 0;
 
     return RET_SUCCESS;
