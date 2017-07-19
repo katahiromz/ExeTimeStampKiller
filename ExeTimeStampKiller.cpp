@@ -36,7 +36,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.1 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.2 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
@@ -188,10 +188,10 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
         return RET_SUCCESS;
 
-    DOWRD offset = PointerToSymbolTable;
+    DWORD offset = PointerToSymbolTable;
 
     DWORD size = NumberOfSymbols * sizeof(IMAGE_SYMBOL);
-    mapping.SetPos(offset);
+    mapping.SetPos64(offset);
     MTypedMapView<IMAGE_SYMBOL> symbols = mapping.GetTypedData<IMAGE_SYMBOL>(size);
     if (!symbols)
     {
