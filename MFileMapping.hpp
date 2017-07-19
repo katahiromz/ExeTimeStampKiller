@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #ifndef MZC4_MFILEMAPPING_HPP_
-#define MZC4_MFILEMAPPING_HPP_      23      /* Version 23 */
+#define MZC4_MFILEMAPPING_HPP_      24      /* Version 24 */
 
 class MMapView;
     template <typename T>
@@ -157,7 +157,7 @@ public:
     {
         return Seek(dwOffsetHigh, dwOffsetLow, TRUE);
     }
-    DWORD SetPos64(DWORDLONG offset)
+    DWORDLONG SetPos64(DWORDLONG offset)
     {
         return Seek64(offset, TRUE);
     }
