@@ -36,7 +36,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.3 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.4 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
@@ -81,8 +81,8 @@ static inline void dprintf(const char *fmt, ...)
     wvsprintfA(buf, fmt, va);
     va_end(va);
 
-    fputs(buf, stderr);
-    fflush(stderr);
+    fputs(buf, stdout);
+    fflush(stdout);
 }
 
 enum RETURN_CODE
@@ -188,16 +188,10 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
     if (NumberOfSymbols == 0 || PointerToSymbolTable == 0)
         return RET_SUCCESS;
 
-    DWORD offset = PointerToSymbolTable;
+    DWORDLONG old_pos = mapping.GetPos64();
 
-    DWORD size = NumberOfSymbols * sizeof(IMAGE_SYMBOL);
+    DWORD offset = PointerToSymbolTable;
     mapping.SetPos64(offset);
-    MTypedMapView<IMAGE_SYMBOL> symbols = mapping.GetTypedData<IMAGE_SYMBOL>(size);
-    if (!symbols)
-    {
-        eprintf("ERROR: Unable to read\n");
-        return RET_CANNOTREAD;
-    }
 
     DWORD StorageClass = IMAGE_SYM_CLASS_NULL;
     DWORD NumberOfAuxSymbols = 0;
@@ -205,33 +199,47 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
     {
         if (NumberOfAuxSymbols)
         {
-            IMAGE_AUX_SYMBOL& aux = (IMAGE_AUX_SYMBOL&)symbols[i];
+            MTypedMapView<IMAGE_AUX_SYMBOL> aux = mapping.GetTypedData<IMAGE_AUX_SYMBOL>();
+            if (!aux)
+            {
+                eprintf("ERROR: Unable to read\n");
+                return RET_CANNOTREAD;
+            }
 
             dprintf("[IMAGE_AUX_SYMBOL #%lu @ 0x%08lX]\n", i, offset);
 
             if (StorageClass == IMAGE_SYM_CLASS_SECTION)
             {
                 // FUCK
-                aux.Section.CheckSum = 0;
+                aux->Section.CheckSum = 0;
             }
 
             --NumberOfAuxSymbols;
         }
         else
         {
-            dprintf("[IMAGE_SYMBOL #%lu @ 0x%08lX]\n", i, offset);
-            dprintf("Value: 0x%08lX\n", symbols[i].Value);
-            dprintf("SectionNumber: 0x%04X\n", symbols[i].SectionNumber);
-            dprintf("Type: 0x%04X\n", symbols[i].Type);
-            dprintf("StorageClass: 0x%02X\n", symbols[i].StorageClass);
-            dprintf("NumberOfAuxSymbols: 0x%02X\n", symbols[i].NumberOfAuxSymbols);
+            MTypedMapView<IMAGE_SYMBOL> sym = mapping.GetTypedData<IMAGE_SYMBOL>();
+            if (!sym)
+            {
+                eprintf("ERROR: Unable to read\n");
+                return RET_CANNOTREAD;
+            }
 
-            StorageClass = symbols[i].StorageClass;
-            NumberOfAuxSymbols = symbols[i].NumberOfAuxSymbols;
+            dprintf("[IMAGE_SYMBOL #%lu @ 0x%08lX]\n", i, offset);
+            dprintf("Value: 0x%08lX\n", sym->Value);
+            dprintf("SectionNumber: 0x%04X\n", (WORD)sym->SectionNumber);
+            dprintf("Type: 0x%04X\n", sym->Type);
+            dprintf("StorageClass: 0x%02X\n", sym->StorageClass);
+            dprintf("NumberOfAuxSymbols: 0x%02X\n", sym->NumberOfAuxSymbols);
+
+            StorageClass = sym->StorageClass;
+            NumberOfAuxSymbols = sym->NumberOfAuxSymbols;
         }
         offset += sizeof(IMAGE_SYMBOL);
+        mapping.SetPos64(offset);
     }
 
+    mapping.SetPos64(old_pos);
     return RET_SUCCESS;
 }
 
