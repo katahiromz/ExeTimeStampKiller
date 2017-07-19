@@ -36,7 +36,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.5 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.6 / 2017.07.19\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).\n");
 }
@@ -182,6 +182,7 @@ struct SECTION_INFO
 
 ////////////////////////////////////////////////////////////////////////////
 
+#ifdef USELESS_FUNCTIONS
 static INT
 DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 {
@@ -242,6 +243,7 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
     mapping.SetPos64(old_pos);
     return RET_SUCCESS;
 }
+#endif  // def USELESS_FUNCTIONS
 
 static INT
 DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file, DWORD offset)
@@ -258,6 +260,7 @@ DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file, DWORD offset)
     // FUCK
     file.TimeDateStamp = g_dwTimeStamp;
 
+#ifdef USELESS_FUNCTIONS
     DWORD PointerToSymbolTable = file.PointerToSymbolTable;
     DWORD NumberOfSymbols = file.NumberOfSymbols;
     if (NumberOfSymbols)
@@ -266,6 +269,7 @@ DoFileHeader(MFileMapping& mapping, IMAGE_FILE_HEADER& file, DWORD offset)
         if (ret)
             return ret;
     }
+#endif  // def USELESS_FUNCTIONS
 
     return RET_SUCCESS;
 }
@@ -300,6 +304,7 @@ DoExp(MFileMapping& mapping, DWORD offset, DWORD size)
     return RET_SUCCESS;
 }
 
+#ifdef USELESS_FUNCTIONS
 static INT
 DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
@@ -344,6 +349,7 @@ DoImp(MFileMapping& mapping, DWORD offset, DWORD size)
 
     return RET_SUCCESS;
 }
+#endif  // def USELESS_FUNCTIONS
 
 static INT
 DoResDir(MFileMapping& mapping, SECTION_INFO& sec_info,
@@ -545,6 +551,7 @@ DoDebug(MFileMapping& mapping, DWORD offset, DWORD size)
     return RET_SUCCESS;
 }
 
+#ifdef USELESS_FUNCTIONS
 static INT
 DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
 {
@@ -605,6 +612,7 @@ DoBoundImp(MFileMapping& mapping, DWORD offset, DWORD size)
 
     return RET_SUCCESS;
 }
+#endif  // def USELESS_FUNCTIONS
 
 static INT
 DoDelayImp(MFileMapping& mapping, DWORD offset, DWORD size)
@@ -646,6 +654,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         dprintf("DoExp done.\n");
     }
 
+#ifdef USELESS_FUNCTIONS
     data = &pDir[IMAGE_DIRECTORY_ENTRY_IMPORT];
     offset = sec_info.OffsetFromRVA(data->VirtualAddress);
     size = data->Size;
@@ -656,6 +665,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
             return ret;
         dprintf("DoImp done.\n");
     }
+#endif
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_RESOURCE];
     offset = sec_info.OffsetFromRVA(data->VirtualAddress);
@@ -690,6 +700,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
         dprintf("DoDebug done.\n");
     }
 
+#ifdef USELESS_FUNCTIONS
     data = &pDir[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT];
     offset = sec_info.OffsetFromRVA(data->VirtualAddress);
     size = data->Size;
@@ -700,6 +711,7 @@ DoSect(MFileMapping& mapping, SECTION_INFO& sec_info,
             return ret;
         dprintf("DoBoundImp done.\n");
     }
+#endif
 
     data = &pDir[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT];
     offset = sec_info.OffsetFromRVA(data->VirtualAddress);
