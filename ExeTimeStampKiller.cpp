@@ -1028,8 +1028,7 @@ static INT ParseCommandLine(INT argc, TCHAR **targv)
             if (i + 1 < argc)
             {
                 bSetHex = TRUE;
-                arg = targv[i + 1];
-                ++i;
+                arg = targv[++i];
 
                 TCHAR *endptr;
                 DWORD dw = _tcstoul(arg, &endptr, 16);
@@ -1057,8 +1056,7 @@ static INT ParseCommandLine(INT argc, TCHAR **targv)
             // -d YYYYMMDD
             if (i + 1 < argc)
             {
-                arg = targv[i + 1];
-                ++i;
+                arg = targv[++i];
                 if (lstrlen(arg) != 8)
                 {
                     eprintf("ERROR: Invalid '-d' parameter.\n");
@@ -1089,8 +1087,7 @@ static INT ParseCommandLine(INT argc, TCHAR **targv)
             // -t HHmmss
             if (i + 1 < argc)
             {
-                arg = targv[i + 1];
-                ++i;
+                arg = targv[++i];
                 if (lstrlen(arg) == 6)
                 {
                     for (int k = 0; k < 6; ++k)
