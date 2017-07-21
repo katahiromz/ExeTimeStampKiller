@@ -36,7 +36,7 @@ static void InitApp(void)
 
 static void ShowVersion(void)
 {
-    puts("ExeTimeStampKiller Version 0.9.7 / 2017.07.19\n"
+    puts("ExeTimeStampKiller Version 0.9.8 / 2017.07.21\n"
          "Written by Katayama Hirofumi MZ <katayama.hirofumi.mz@gmail.com>.\n"
          "This software is public domain software (PDS).");
 }
@@ -211,7 +211,7 @@ DoSym(MFileMapping& mapping, DWORD PointerToSymbolTable, DWORD NumberOfSymbols)
 
             if (StorageClass == IMAGE_SYM_CLASS_SECTION)
             {
-                // No effect.
+                // Don't touch!
                 // FUCK
                 //aux->Section.CheckSum = 0;
             }
@@ -973,12 +973,12 @@ static inline DWORDLONG SystemTimeToQuad(const SYSTEMTIME *pst)
     return FileTimeToQuad(&ft);
 }
 
-static inline DWORDLONG LocalTimeToQuad(const SYSTEMTIME *pst)
+static inline DWORDLONG LocalTimeToQuad(const SYSTEMTIME *pstLocal)
 {
-    FILETIME ft, ftLocal;
-    SystemTimeToFileTime(pst, &ft);
-    LocalFileTimeToFileTime(&ft, &ftLocal);
-    return FileTimeToQuad(&ftLocal);
+    FILETIME ftLocal, ft;
+    SystemTimeToFileTime(pstLocal, &ftLocal);
+    LocalFileTimeToFileTime(&ftLocal, &ft);
+    return FileTimeToQuad(&ft);
 }
 
 static inline DWORDLONG EpicQuad(void)
@@ -1004,6 +1004,7 @@ SystemTimeToTimeStamp(const SYSTEMTIME *pst, BOOL bGlobal)
         quad = SystemTimeToQuad(pst);
     else
         quad = LocalTimeToQuad(pst);
+
     return QuadToTimeStamp(quad);
 }
 
